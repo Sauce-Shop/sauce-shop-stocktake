@@ -337,6 +337,10 @@
           <label>Azure App Client ID</label>
           <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
         </div>
+        <div class="form-group">
+          <label>Azure Tenant ID</label>
+          <input type="text" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        </div>
         <button class="btn btn-primary btn-full" onclick="saveSettings()">Save Settings</button>
         <div id="settings-status" style="margin-top:12px;font-size:13px;"></div>
       </div>
@@ -362,7 +366,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.3";
+const APP_VERSION = "1.0.4";
 
 // ============================================================
 // EMBEDDED DATA
@@ -387,7 +391,8 @@ let CONFIG = {
   siteUrl: '',
   listStockTakes: 'StockTakes',
   listEntries: 'StockTakeEntries',
-  clientId: ''
+  clientId: '',
+  tenantId: ''
 };
 
 function loadConfig() {
@@ -400,6 +405,7 @@ function saveSettings() {
   CONFIG.listStockTakes = document.getElementById('sp-list-stocktakes').value.trim() || 'StockTakes';
   CONFIG.listEntries = document.getElementById('sp-list-entries').value.trim() || 'StockTakeEntries';
   CONFIG.clientId = document.getElementById('sp-client-id').value.trim();
+  CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   document.getElementById('settings-status').innerHTML = '<span class="text-success">✓ Saved</span>';
   // Re-init MSAL with new client ID if needed
@@ -412,6 +418,7 @@ function loadSettingsUI() {
   document.getElementById('sp-list-stocktakes').value = CONFIG.listStockTakes;
   document.getElementById('sp-list-entries').value = CONFIG.listEntries;
   document.getElementById('sp-client-id').value = CONFIG.clientId;
+  document.getElementById('sp-tenant-id').value = CONFIG.tenantId || '';
 }
 
 // ============================================================
@@ -426,7 +433,7 @@ function initMsal() {
   const msalConfig = {
     auth: {
       clientId: CONFIG.clientId,
-      authority: 'https://login.microsoftonline.com/common',
+      authority: 'https://login.microsoftonline.com/' + (CONFIG.tenantId || 'common'),
       redirectUri: window.location.origin + window.location.pathname
     },
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
