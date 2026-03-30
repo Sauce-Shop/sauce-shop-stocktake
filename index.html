@@ -286,17 +286,19 @@
             <div id="sel-prod-code" style="font-weight:700;font-size:15px;"></div>
             <div id="sel-prod-desc" style="font-size:13px;color:var(--text-muted);"></div>
           </div>
-          <div class="flex-row">
-            <div class="form-group" style="flex:0 0 100px; margin-bottom:0">
+          <div class="flex-row" style="margin-bottom:10px;">
+            <div class="form-group" style="flex:0 0 100px;margin-bottom:0;">
               <label>Qty</label>
               <input type="number" id="add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
             </div>
-            <div style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary btn-full" onclick="addProductEntry()" id="add-product-btn" disabled>
-                Add to Count
-              </button>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Batch Code</label>
+              <input type="text" id="add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
             </div>
           </div>
+          <button class="btn btn-primary btn-full" onclick="addProductEntry()" id="add-product-btn" disabled>
+            Add to Count
+          </button>
         </div>
 
         <!-- Bottom actions -->
@@ -382,7 +384,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -609,6 +611,7 @@ async function getListItems(listName, filter = '') {
       f.ProductCode   = f.field_3;
       f.ProductDescription = f.field_4;
       f.CountQty      = f.field_5 !== undefined ? Number(f.field_5) : 0;
+      f.BatchCode     = f.field_6 || '';
     }
     return f;
   });
@@ -699,8 +702,9 @@ function renderStockTakesList(items) {
           <div class="stocktake-name">${st.Title || 'Untitled'}</div>
           <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
+          <button class="btn btn-secondary btn-sm" onclick="viewFullStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">📋 View</button>
           ${st.StockTakeStatus !== 'Complete'
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
@@ -906,6 +910,7 @@ function renderLocationEntries() {
       <div class="entry-info">
         <div class="entry-code">${e.ProductCode}</div>
         <div class="entry-desc">${e.ProductDescription || ''}</div>
+        ${e.BatchCode ? `<div style="font-size:11px;color:#888;">Batch: ${e.BatchCode}</div>` : ''}
         ${getPrevQtyHtml(e.ProductCode)}
       </div>
       <div class="entry-qty">
@@ -1025,10 +1030,13 @@ async function addProductEntry() {
   if (existing) {
     // Update quantity instead
     const newQty = existing.CountQty + qty;
-    await updateQty(existing.id, newQty, true);
+    const batch = document.getElementById('add-batch').value.trim().toUpperCase();
+    if (batch) existing.BatchCode = batch; // update batch if provided
+    await updateQty(existing.id, newQty, batch, true);
     toast(`Updated ${selectedProduct.code}: ${newQty}`, 'success');
   } else {
-    await saveEntry(selectedProduct.code, selectedProduct.description, qty);
+    const batch = document.getElementById('add-batch').value.trim().toUpperCase();
+    await saveEntry(selectedProduct.code, selectedProduct.description, qty, batch);
     toast(`Added ${selectedProduct.code}`, 'success');
   }
 
@@ -1036,20 +1044,22 @@ async function addProductEntry() {
   document.getElementById('product-search').value = '';
   document.getElementById('selected-product-preview').style.display = 'none';
   document.getElementById('add-qty').value = '1';
+  document.getElementById('add-batch').value = '';
   document.getElementById('add-product-btn').disabled = true;
   selectedProduct = null;
   document.getElementById('product-search').focus();
 }
 
-async function saveEntry(productCode, productDesc, qty) {
+async function saveEntry(productCode, productDesc, qty, batch = '') {
   try {
     const entry = await createListItem(CONFIG.listEntries, {
-      Title:   currentStockTake.id,   // StockTakeId
+      Title:   currentStockTake.id,    // StockTakeId
       field_1: currentStockTake.Title, // StockTakeName
       field_2: currentLocation,        // LocationCode
       field_3: productCode,            // ProductCode
       field_4: productDesc || '',      // ProductDescription
-      field_5: qty                     // CountQty
+      field_5: qty,                    // CountQty
+      field_6: batch || ''             // BatchCode
     });
     // Push with friendly names so the rest of the app works
     allEntries.push({
@@ -1059,7 +1069,8 @@ async function saveEntry(productCode, productDesc, qty) {
       LocationCode: currentLocation,
       ProductCode: productCode,
       ProductDescription: productDesc || '',
-      CountQty: qty
+      CountQty: qty,
+      BatchCode: batch || ''
     });
     locationEntries = allEntries.filter(e => e.LocationCode === currentLocation);
     renderLocationEntries();
@@ -1073,13 +1084,18 @@ async function saveEntry(productCode, productDesc, qty) {
   }
 }
 
-async function updateQty(entryId, newQty, silent = false) {
+async function updateQty(entryId, newQty, batch = '', silent = false) {
+  // Handle old call signature updateQty(id, qty, silent) where batch was not present
+  if (typeof batch === 'boolean') { silent = batch; batch = ''; }
   const qty = parseInt(newQty) || 0;
   const entry = allEntries.find(e => e.id === entryId);
   if (!entry) return;
   entry.CountQty = qty;
+  if (batch) entry.BatchCode = batch;
+  const fields = { field_5: qty };
+  if (batch) fields.field_6 = batch;
   try {
-    await updateListItem(CONFIG.listEntries, entryId, { field_5: qty }); // CountQty
+    await updateListItem(CONFIG.listEntries, entryId, fields);
     if (!silent) toast('Quantity updated', 'success');
   } catch (e) {
     if (!silent) toast('Error: ' + e.message, 'error');
@@ -1124,6 +1140,28 @@ async function completeStockTake() {
     showSummary();
   } catch (e) {
     toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function viewFullStockTake(st) {
+  const modal = document.getElementById('liveview-modal');
+  document.getElementById('lv-title').textContent = st.Title;
+  document.getElementById('lv-meta').textContent = 'Loading…';
+  document.getElementById('lv-body').innerHTML = '<div style="text-align:center;padding:32px;color:#888;"><div class="spinner"></div><br>Loading entries…</div>';
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  try {
+    const entries = await getListItems(CONFIG.listEntries, `Title eq '${st.id}'`);
+    // Temporarily set allEntries and currentStockTake so showLiveView works
+    const prevEntries = allEntries;
+    const prevST = currentStockTake;
+    allEntries = entries;
+    currentStockTake = st;
+    showLiveView();
+    allEntries = prevEntries;
+    currentStockTake = prevST;
+  } catch(e) {
+    document.getElementById('lv-body').innerHTML = `<div style="color:#c62828;padding:16px;">Error loading entries: ${e.message}</div>`;
   }
 }
 
@@ -1410,6 +1448,7 @@ function showLiveView() {
               <tr style="background:#f5f5f5;">
                 <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Code</th>
                 <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Description</th>
+                <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Batch</th>
                 <th style="padding:6px 8px;text-align:right;color:#666;font-size:11px;text-transform:uppercase;">Qty</th>
               </tr>
             </thead>
@@ -1418,6 +1457,7 @@ function showLiveView() {
                 <tr style="border-bottom:1px solid #f0f0f0;">
                   <td style="padding:7px 8px;font-weight:700;">${e.ProductCode}</td>
                   <td style="padding:7px 8px;color:#555;">${e.ProductDescription || ''}</td>
+                  <td style="padding:7px 8px;color:#888;font-size:12px;">${e.BatchCode || '—'}</td>
                   <td style="padding:7px 8px;text-align:right;font-weight:700;">${e.CountQty}</td>
                 </tr>
               `).join('')}
