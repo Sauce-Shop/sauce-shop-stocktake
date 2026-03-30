@@ -188,6 +188,12 @@
     </button>
     <div id="auth-error" style="color:#c62828;font-size:13px;margin-top:16px;display:none;"></div>
   </div>
+  <div style="margin-top:20px;">
+    <button onclick="document.getElementById('auth-screen').style.display='none';document.getElementById('app').style.display='flex';showSettingsView();"
+      style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;text-decoration:underline;">
+      ⚙ App settings
+    </button>
+  </div>
 </div>
 
 <!-- MAIN APP -->
@@ -1332,13 +1338,7 @@ msalScript.onload = () => {
     initMsal();
     trySilentSignIn();
   } else {
-    // Show settings gear on auth screen
-    document.getElementById('auth-screen').innerHTML += `
-      <div style="margin-top:24px">
-        <button class="btn btn-secondary" onclick="document.getElementById('auth-screen').style.display='none';document.getElementById('app').style.display='flex';showSettingsView();">
-          ⚙ First-time setup
-        </button>
-      </div>`;
+    // Settings link is always visible on auth screen
   }
 };
 document.head.appendChild(msalScript);
