@@ -302,8 +302,9 @@
         <!-- Bottom actions -->
         <div class="bottom-actions">
           <button class="btn btn-secondary" style="flex:1" onclick="goHome()">← Back</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="showLiveView()">📋 Live View</button>
           <button class="btn btn-success" style="flex:2" onclick="completeStockTake()" id="complete-btn">
-            ✓ Complete Stock Take
+            ✓ Complete
           </button>
         </div>
       </div>
@@ -349,6 +350,20 @@
   </main>
 </div>
 
+<!-- LIVE VIEW MODAL -->
+<div id="liveview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;overflow-y:auto;padding:16px;">
+  <div style="background:white;border-radius:12px;max-width:700px;margin:0 auto;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:800;font-size:17px" id="lv-title"></div>
+        <div style="font-size:12px;opacity:0.8" id="lv-meta"></div>
+      </div>
+      <button onclick="closeLiveView()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:14px;">✕ Close</button>
+    </div>
+    <div style="padding:16px;" id="lv-body"></div>
+  </div>
+</div>
+
 <!-- SCANNER OVERLAY -->
 <div id="scanner-overlay">
   <div id="scanner-container">
@@ -367,7 +382,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.9";
+const APP_VERSION = "1.1.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1029,6 +1044,16 @@ async function addProductEntry() {
 async function saveEntry(productCode, productDesc, qty) {
   try {
     const entry = await createListItem(CONFIG.listEntries, {
+      Title:   currentStockTake.id,   // StockTakeId
+      field_1: currentStockTake.Title, // StockTakeName
+      field_2: currentLocation,        // LocationCode
+      field_3: productCode,            // ProductCode
+      field_4: productDesc || '',      // ProductDescription
+      field_5: qty                     // CountQty
+    });
+    // Push with friendly names so the rest of the app works
+    allEntries.push({
+      id: entry.id,
       StockTakeId: currentStockTake.id,
       StockTakeName: currentStockTake.Title,
       LocationCode: currentLocation,
@@ -1036,12 +1061,9 @@ async function saveEntry(productCode, productDesc, qty) {
       ProductDescription: productDesc || '',
       CountQty: qty
     });
-    allEntries.push({ id: entry.id, StockTakeId: currentStockTake.id, StockTakeName: currentStockTake.Title,
-      LocationCode: currentLocation, ProductCode: productCode, ProductDescription: productDesc, CountQty: qty });
     locationEntries = allEntries.filter(e => e.LocationCode === currentLocation);
     renderLocationEntries();
-
-    // Update count on stock take
+    // Update entry count on stock take
     try {
       await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_2: allEntries.length });
       currentStockTake.EntryCount = allEntries.length;
@@ -1350,6 +1372,70 @@ document.addEventListener('keydown', (e) => {
     wedgeTimer = setTimeout(() => { wedgeBuffer = ''; }, 100);
   }
 });
+
+// ============================================================
+// LIVE VIEW
+// ============================================================
+function showLiveView() {
+  // Group all entries by location
+  const byLocation = {};
+  allEntries.forEach(e => {
+    if (!byLocation[e.LocationCode]) byLocation[e.LocationCode] = [];
+    byLocation[e.LocationCode].push(e);
+  });
+
+  const locations = Object.keys(byLocation).sort();
+  const totalProducts = allEntries.length;
+  const totalQty = allEntries.reduce((s, e) => s + (Number(e.CountQty) || 0), 0);
+
+  document.getElementById('lv-title').textContent = currentStockTake.Title;
+  document.getElementById('lv-meta').textContent =
+    `${locations.length} locations · ${totalProducts} lines · ${totalQty} total units`;
+
+  let html = '';
+  if (locations.length === 0) {
+    html = '<div style="text-align:center;padding:32px;color:#888;">No entries yet.</div>';
+  } else {
+    locations.forEach(loc => {
+      const entries = byLocation[loc];
+      const locTotal = entries.reduce((s, e) => s + (Number(e.CountQty) || 0), 0);
+      html += `
+        <div style="margin-bottom:20px;">
+          <div style="font-weight:800;font-size:14px;color:var(--brand);padding:6px 0;border-bottom:2px solid var(--brand);margin-bottom:8px;display:flex;justify-content:space-between;">
+            <span>${loc}</span>
+            <span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f5f5f5;">
+                <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Code</th>
+                <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Description</th>
+                <th style="padding:6px 8px;text-align:right;color:#666;font-size:11px;text-transform:uppercase;">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr style="border-bottom:1px solid #f0f0f0;">
+                  <td style="padding:7px 8px;font-weight:700;">${e.ProductCode}</td>
+                  <td style="padding:7px 8px;color:#555;">${e.ProductDescription || ''}</td>
+                  <td style="padding:7px 8px;text-align:right;font-weight:700;">${e.CountQty}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    });
+  }
+
+  document.getElementById('lv-body').innerHTML = html;
+  document.getElementById('liveview-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLiveView() {
+  document.getElementById('liveview-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
 
 // ============================================================
 // UTILITIES
