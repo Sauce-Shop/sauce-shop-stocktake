@@ -338,8 +338,9 @@
           <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
         </div>
         <div class="form-group">
-          <label>Azure Tenant ID</label>
+          <label>Azure Tenant ID <span style="color:#c62828">*required</span></label>
           <input type="text" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          <div style="font-size:11px;color:#888;margin-top:4px">Found in Azure Portal → Microsoft Entra ID → Overview</div>
         </div>
         <button class="btn btn-primary btn-full" onclick="saveSettings()">Save Settings</button>
         <div id="settings-status" style="margin-top:12px;font-size:13px;"></div>
@@ -366,7 +367,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.4";
+const APP_VERSION = "1.0.5";
 
 // ============================================================
 // EMBEDDED DATA
@@ -407,7 +408,15 @@ function saveSettings() {
   CONFIG.clientId = document.getElementById('sp-client-id').value.trim();
   CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
-  document.getElementById('settings-status').innerHTML = '<span class="text-success">✓ Saved</span>';
+  const missing = [];
+  if (!CONFIG.clientId) missing.push('Client ID');
+  if (!CONFIG.tenantId) missing.push('Tenant ID');
+  if (!CONFIG.siteUrl) missing.push('SharePoint Site URL');
+  if (missing.length) {
+    document.getElementById('settings-status').innerHTML = '<span style="color:#c62828">⚠ Missing: ' + missing.join(', ') + '</span>';
+  } else {
+    document.getElementById('settings-status').innerHTML = '<span class="text-success">✓ All settings saved</span>';
+  }
   // Re-init MSAL with new client ID if needed
   if (CONFIG.clientId) initMsal();
   toast('Settings saved', 'success');
@@ -444,6 +453,8 @@ function initMsal() {
 const SCOPES = ['https://graph.microsoft.com/Sites.ReadWrite.All'];
 
 async function signIn() {
+  // Always reload config fresh and re-init MSAL so we pick up latest saved settings
+  loadConfig();
   if (!CONFIG.clientId) {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
@@ -451,6 +462,15 @@ async function signIn() {
     toast('Please configure the app first — enter your Client ID below', 'error');
     return;
   }
+  if (!CONFIG.tenantId) {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    showSettingsView();
+    toast('Please enter your Azure Tenant ID in settings', 'error');
+    return;
+  }
+  // Re-init MSAL with latest config every time
+  initMsal();
   if (!msalInstance) {
     document.getElementById('auth-error').style.display = 'block';
     document.getElementById('auth-error').textContent = 'Authentication library not ready. Make sure you are opening this via its https:// GitHub Pages URL in Edge or Chrome.';
