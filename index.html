@@ -367,7 +367,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.6";
+const APP_VERSION = "1.0.7";
 
 // ============================================================
 // EMBEDDED DATA
@@ -688,11 +688,11 @@ async function createStockTake() {
   try {
     const item = await createListItem(CONFIG.listStockTakes, {
       Title: customName,
-      StockTakeStockTakeStatus: 'Open',
+      StockTakeStatus: 'Open',
       EntryCount: 0
     });
     toast('Stock take created', 'success');
-    openStockTake({ id: item.id, Title: customName, StockTakeStockTakeStatus: 'Open', EntryCount: 0, Created: new Date().toISOString() });
+    openStockTake({ id: item.id, Title: customName, StockTakeStatus: 'Open', EntryCount: 0, Created: new Date().toISOString() });
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
