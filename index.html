@@ -367,7 +367,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.6";
 
 // ============================================================
 // EMBEDDED DATA
@@ -669,8 +669,8 @@ function renderStockTakesList(items) {
           <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="badge ${st.Status === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.Status || 'Open'}</span>
-          ${st.Status !== 'Complete'
+          <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
+          ${st.StockTakeStatus !== 'Complete'
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
           }
@@ -688,11 +688,11 @@ async function createStockTake() {
   try {
     const item = await createListItem(CONFIG.listStockTakes, {
       Title: customName,
-      Status: 'Open',
+      StockTakeStockTakeStatus: 'Open',
       EntryCount: 0
     });
     toast('Stock take created', 'success');
-    openStockTake({ id: item.id, Title: customName, Status: 'Open', EntryCount: 0, Created: new Date().toISOString() });
+    openStockTake({ id: item.id, Title: customName, StockTakeStockTakeStatus: 'Open', EntryCount: 0, Created: new Date().toISOString() });
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
@@ -738,7 +738,7 @@ async function loadPreviousEntries() {
   try {
     const allSTs = await getListItems(CONFIG.listStockTakes);
     const completed = allSTs
-      .filter(s => s.Status === 'Complete' && s.id !== currentStockTake.id)
+      .filter(s => s.StockTakeStatus === 'Complete' && s.id !== currentStockTake.id)
       .sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
     if (completed.length === 0) return;
     const lastST = completed[0];
@@ -1080,7 +1080,7 @@ async function completeStockTake() {
   if (!confirm('Complete this stock take? You will be able to download the CSV.')) return;
 
   try {
-    await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { Status: 'Complete' });
+    await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { StockTakeStatus: 'Complete' });
     currentStockTake.Status = 'Complete';
     toast('Stock take completed!', 'success');
     showSummary();
