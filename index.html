@@ -367,7 +367,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.9";
 
 // ============================================================
 // EMBEDDED DATA
@@ -580,7 +580,23 @@ async function getListItems(listName, filter = '') {
   const listId = await getListId(listName);
   const query = filter ? `?$filter=${encodeURIComponent(filter)}&$expand=fields` : '?$expand=fields&$top=500';
   const data = await spFetch(`/lists/${listId}/items${query}`);
-  return data.value.map(i => ({ id: i.id, ...i.fields }));
+  return data.value.map(i => {
+    const f = { id: i.id, ...i.fields };
+    // Remap SharePoint internal names to friendly names
+    // StockTakes list
+    if (f.field_1 !== undefined && listName === CONFIG.listStockTakes) f.StockTakeStatus = f.field_1;
+    if (f.field_2 !== undefined && listName === CONFIG.listStockTakes) f.EntryCount = f.field_2;
+    // StockTakeEntries list
+    if (listName === CONFIG.listEntries) {
+      f.StockTakeId = f.Title || f.LinkTitle;  // stored in Title column
+      f.StockTakeName = f.field_1;
+      f.LocationCode  = f.field_2;
+      f.ProductCode   = f.field_3;
+      f.ProductDescription = f.field_4;
+      f.CountQty      = f.field_5 !== undefined ? Number(f.field_5) : 0;
+    }
+    return f;
+  });
 }
 
 async function createListItem(listName, fields) {
@@ -688,11 +704,11 @@ async function createStockTake() {
   try {
     const item = await createListItem(CONFIG.listStockTakes, {
       Title: customName,
-      StockTakeStatus: 'Open',
-      EntryCount: 0
+      field_1: 'Open',
+      field_2: 0
     });
     toast('Stock take created', 'success');
-    openStockTake({ id: item.id, Title: customName, StockTakeStatus: 'Open', EntryCount: 0, Created: new Date().toISOString() });
+    openStockTake({ id: item.id, Title: customName, field_1: 'Open', field_2: 0, Created: new Date().toISOString() });
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
@@ -724,7 +740,7 @@ async function openStockTake(st) {
   // Load all existing entries for this stock take
   try {
     allEntries = await getListItems(CONFIG.listEntries,
-      `StockTakeId eq '${st.id}'`);
+      `Title eq '${st.id}'`);
   } catch {
     allEntries = [];
   }
@@ -1027,7 +1043,7 @@ async function saveEntry(productCode, productDesc, qty) {
 
     // Update count on stock take
     try {
-      await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { EntryCount: allEntries.length });
+      await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_2: allEntries.length });
       currentStockTake.EntryCount = allEntries.length;
     } catch {}
   } catch (e) {
@@ -1041,7 +1057,7 @@ async function updateQty(entryId, newQty, silent = false) {
   if (!entry) return;
   entry.CountQty = qty;
   try {
-    await updateListItem(CONFIG.listEntries, entryId, { CountQty: qty });
+    await updateListItem(CONFIG.listEntries, entryId, { field_5: qty }); // CountQty
     if (!silent) toast('Quantity updated', 'success');
   } catch (e) {
     if (!silent) toast('Error: ' + e.message, 'error');
@@ -1080,7 +1096,7 @@ async function completeStockTake() {
   if (!confirm('Complete this stock take? You will be able to download the CSV.')) return;
 
   try {
-    await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { StockTakeStatus: 'Complete' });
+    await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_1: 'Complete' });
     currentStockTake.Status = 'Complete';
     toast('Stock take completed!', 'success');
     showSummary();
@@ -1092,7 +1108,7 @@ async function completeStockTake() {
 async function viewSummary(st) {
   currentStockTake = st;
   try {
-    allEntries = await getListItems(CONFIG.listEntries, `StockTakeId eq '${st.id}'`);
+    allEntries = await getListItems(CONFIG.listEntries, `Title eq '${st.id}'`);
   } catch {
     allEntries = [];
   }
