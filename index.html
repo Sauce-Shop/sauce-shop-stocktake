@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.7.4";
+const APP_VERSION = "1.7.6";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1703,7 +1703,6 @@ let scanBuffer = {};
 
 function onBarcodeDetected(result) {
   const code = result.codeResult.code;
-  const format = result.codeResult.format;
   if (!code) return;
 
   // Check decodedCodes error rate — reject low-confidence reads
@@ -1711,9 +1710,9 @@ function onBarcodeDetected(result) {
     .filter(c => c.error !== undefined)
     .map(c => c.error);
   const avgError = errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : 1;
-  if (avgError > 0.15) return; // too many errors — skip this frame
+  if (avgError > 0.15) return;
 
-  // Accumulate consistent reads
+  // Require 3 consistent reads on all scans
   scanBuffer[code] = (scanBuffer[code] || 0) + 1;
   if (scanBuffer[code] >= SCAN_REQUIRED_MATCHES) {
     scanBuffer = {};
@@ -1756,14 +1755,10 @@ function handleScannedCode(code, target) {
       }
     }
   } else if (target === 'ps-barcode') {
-    // Scanned from product search modal — set as pending barcode
     if (psSelectedProduct) {
-      if (psSelectedProduct.barcode) {
-        toast('This product already has a barcode set', 'error');
-      } else {
-        setPsBarcode(code);
-        toast('Barcode scanned — tap Save to confirm', 'success');
-      }
+      // Always allow — covers both adding new and editing existing barcode
+      setPsBarcode(code);
+      toast('Barcode scanned — tap Save to confirm', 'success');
     } else {
       // No product selected yet — use scan to search
       document.getElementById('ps-search').value = code;
