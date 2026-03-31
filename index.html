@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.8.2";
+const APP_VERSION = "1.8.3";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1152,6 +1152,7 @@ function renderLocationEntries() {
     noEntries.style.display = 'block';
 
     // Show previous entries as suggestions
+    console.log('currentLocation:', currentLocation, '| previousEntries keys:', Object.keys(previousEntries));
     const prev = previousEntries[currentLocation];
     if (prev && prev.length > 0) {
       noEntries.style.display = 'none';
