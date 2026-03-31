@@ -213,9 +213,14 @@
     <div id="view-home" class="view active">
       <div class="card">
         <h2>📋 Stock Takes</h2>
-        <button class="btn btn-primary btn-full" onclick="createStockTake()">
-          + New Stock Take
-        </button>
+        <div style="display:flex;gap:10px;margin-bottom:0;">
+          <button class="btn btn-primary" style="flex:2" onclick="createStockTake()">
+            + New Stock Take
+          </button>
+          <button class="btn btn-secondary" style="flex:1" onclick="showProductSearch()">
+            🔍 Products
+          </button>
+        </div>
       </div>
       <div id="stocktakes-list">
         <div class="loading"><div class="spinner"></div><br>Loading...</div>
@@ -482,6 +487,64 @@
   </div>
 </div>
 
+<!-- PRODUCT SEARCH MODAL -->
+<div id="product-search-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:520px;overflow:hidden;margin-top:8px;">
+    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;">
+      <div style="font-weight:800;font-size:17px;">🔍 Product Search</div>
+      <button onclick="closeProductSearchModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:14px;">✕ Close</button>
+    </div>
+    <div style="padding:16px;">
+      <!-- Search input -->
+      <div class="input-with-btn" style="margin-bottom:16px;">
+        <div class="search-wrapper" style="flex:1;">
+          <input type="text" id="ps-search" placeholder="Type product code, name or scan EAN…"
+            autocomplete="off" autocorrect="off" spellcheck="false"
+            oninput="onProductSearchModal()" onkeydown="onProductSearchModalKeydown(event)">
+          <div id="ps-dropdown" class="search-dropdown" style="display:none;"></div>
+        </div>
+        <button class="btn btn-secondary" onclick="openScanner('ps-barcode')" title="Scan to search">📷</button>
+      </div>
+
+      <!-- Product detail card -->
+      <div id="ps-detail" style="display:none;">
+        <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <div>
+              <div id="ps-code" style="font-weight:800;font-size:18px;color:var(--brand);"></div>
+              <div id="ps-desc" style="font-size:14px;color:#444;margin-top:4px;"></div>
+            </div>
+            <span id="ps-new-badge" style="display:none;background:#fff3cd;color:#856404;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;">NEW</span>
+          </div>
+
+          <!-- EAN / Barcode section -->
+          <div style="border-top:1px solid #e0e0e0;padding-top:12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:8px;">EAN / Barcode</div>
+            <div id="ps-barcode-display" style="display:flex;align-items:center;gap:10px;">
+              <div id="ps-barcode-value" style="font-size:15px;font-family:monospace;font-weight:600;flex:1;"></div>
+              <div id="ps-barcode-actions"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save button (shown when changes pending) -->
+        <div id="ps-save-row" style="display:none;">
+          <button class="btn btn-primary btn-full" onclick="saveProductBarcode()">
+            💾 Save Barcode to Products List
+          </button>
+        </div>
+        <div id="ps-save-status" style="font-size:12px;color:var(--success);margin-top:8px;text-align:center;display:none;"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="ps-empty" style="text-align:center;padding:32px;color:#888;">
+        <div style="font-size:32px;margin-bottom:8px;">📦</div>
+        <div style="font-size:14px;">Search for a product above<br>or scan its barcode</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SCANNER OVERLAY -->
 <div id="scanner-overlay">
   <div id="scanner-container">
@@ -500,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.7.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -846,7 +909,7 @@ function renderStockTakesList(items) {
       <div class="stocktake-item">
         <div>
           <div class="stocktake-name">${st.Title || 'Untitled'}</div>
-          <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries${st.Warehouse ? ' · ' + st.Warehouse : ''}</div>
+          <div class="stocktake-meta">${st.Warehouse ? `<span style="font-weight:600;color:var(--brand)">${st.Warehouse}</span> · ` : ''}${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
@@ -1089,7 +1152,7 @@ function renderLocationEntries() {
             <div class="entry-info">
               <div class="entry-code">${e.ProductCode}</div>
               <div class="entry-desc">${e.ProductDescription || ''}</div>
-              <div class="entry-prev" style="color:var(--info)">Last count: ${e.CountQty}</div>
+              <div class="entry-prev" style="color:var(--info)">Last count: ${e.CountQty}${e.BatchCode ? ` · Batch: <strong>${e.BatchCode}</strong>` : ''}</div>
             </div>
             <button class="btn btn-sm btn-secondary" onclick="copyPrevEntry(${JSON.stringify(e).replace(/"/g, '&quot;')})">
               Use ↵
@@ -1124,15 +1187,23 @@ function renderLocationEntries() {
 function getPrevQtyHtml(productCode) {
   const prev = previousEntries[currentLocation];
   if (!prev) return '';
-  const match = prev.find(e => e.ProductCode === productCode);
-  if (!match) return '';
-  return `<div class="entry-prev">Last count: ${match.CountQty}</div>`;
+  // There may be multiple batches of the same product — show all
+  const matches = prev.filter(e => e.ProductCode === productCode);
+  if (!matches.length) return '';
+  return matches.map(m =>
+    `<div class="entry-prev">Last count: ${m.CountQty}${m.BatchCode ? ` · Batch: <strong>${m.BatchCode}</strong>` : ''}</div>`
+  ).join('');
 }
 
 async function copyPrevEntry(prevEntry) {
-  // Add a new entry copied from the previous count for this location
+  // Copy previous entry including its batch code
   const product = productByCode[prevEntry.ProductCode.toUpperCase()] || {};
-  await saveEntry(prevEntry.ProductCode, product.description || prevEntry.ProductDescription, prevEntry.CountQty);
+  await saveEntry(
+    prevEntry.ProductCode,
+    product.description || prevEntry.ProductDescription,
+    prevEntry.CountQty,
+    prevEntry.BatchCode || ''
+  );
 }
 
 // ============================================================
@@ -1637,7 +1708,6 @@ function closeScanner() {
 
 function handleScannedCode(code, target) {
   if (target === 'location') {
-    // Location barcodes encode the location code directly
     const loc = code.toUpperCase();
     if (buildLocationSet().has(loc)) {
       selectLocation(loc);
@@ -1647,7 +1717,6 @@ function handleScannedCode(code, target) {
       toast('Location not found: ' + loc, 'error');
     }
   } else if (target === 'product') {
-    // Try barcode first, then code
     const byBarcode = productByBarcode[code];
     if (byBarcode) {
       selectProduct(byBarcode);
@@ -1660,6 +1729,20 @@ function handleScannedCode(code, target) {
         onProductSearch();
         toast('Product not found: ' + code, 'error');
       }
+    }
+  } else if (target === 'ps-barcode') {
+    // Scanned from product search modal — set as pending barcode
+    if (psSelectedProduct) {
+      if (psSelectedProduct.barcode) {
+        toast('This product already has a barcode set', 'error');
+      } else {
+        setPsBarcode(code);
+        toast('Barcode scanned — tap Save to confirm', 'success');
+      }
+    } else {
+      // No product selected yet — use scan to search
+      document.getElementById('ps-search').value = code;
+      onProductSearchModal();
     }
   }
 }
@@ -1688,6 +1771,165 @@ document.addEventListener('keydown', (e) => {
     wedgeTimer = setTimeout(() => { wedgeBuffer = ''; }, 100);
   }
 });
+
+// ============================================================
+// PRODUCT SEARCH (home screen)
+// ============================================================
+let psSelectedProduct = null;
+let psPendingBarcode = null;
+let psDropdownItems = [];
+let psHighlightIdx = -1;
+
+function showProductSearch() {
+  psSelectedProduct = null;
+  psPendingBarcode = null;
+  document.getElementById('ps-search').value = '';
+  document.getElementById('ps-dropdown').style.display = 'none';
+  document.getElementById('ps-detail').style.display = 'none';
+  document.getElementById('ps-empty').style.display = 'block';
+  document.getElementById('ps-save-row').style.display = 'none';
+  document.getElementById('ps-save-status').style.display = 'none';
+  document.getElementById('product-search-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('ps-search').focus(), 100);
+}
+
+function closeProductSearchModal() {
+  document.getElementById('product-search-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  psSelectedProduct = null;
+  psPendingBarcode = null;
+}
+
+function onProductSearchModal() {
+  const val = document.getElementById('ps-search').value.trim();
+  const dropdown = document.getElementById('ps-dropdown');
+  psHighlightIdx = -1;
+
+  if (!val) { dropdown.style.display = 'none'; return; }
+
+  // EAN exact match
+  const byBarcode = productByBarcode[val];
+  if (byBarcode && val.length >= 8) {
+    dropdown.style.display = 'none';
+    showProductDetail(byBarcode);
+    return;
+  }
+
+  const upper = val.toUpperCase();
+  psDropdownItems = PRODUCTS.filter(p =>
+    p.code.toUpperCase().includes(upper) ||
+    p.description.toUpperCase().includes(upper)
+  ).slice(0, 12);
+
+  if (!psDropdownItems.length) {
+    dropdown.innerHTML = '<div class="no-results">No matching products</div>';
+    dropdown.style.display = 'block';
+    return;
+  }
+
+  dropdown.innerHTML = psDropdownItems.map((p, i) =>
+    `<div class="search-option" data-idx="${i}" onclick="showProductDetail(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+      <div class="search-option-code">${p.code}</div>
+      <div class="search-option-desc">${p.description}</div>
+    </div>`
+  ).join('');
+  dropdown.style.display = 'block';
+}
+
+function onProductSearchModalKeydown(e) {
+  const dropdown = document.getElementById('ps-dropdown');
+  if (dropdown.style.display === 'none') {
+    if (e.key === 'Enter' && psDropdownItems.length === 1) showProductDetail(psDropdownItems[0]);
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    psHighlightIdx = Math.min(psHighlightIdx + 1, psDropdownItems.length - 1);
+    highlightDropdown('ps-dropdown', psHighlightIdx); e.preventDefault();
+  } else if (e.key === 'ArrowUp') {
+    psHighlightIdx = Math.max(psHighlightIdx - 1, 0);
+    highlightDropdown('ps-dropdown', psHighlightIdx); e.preventDefault();
+  } else if (e.key === 'Enter') {
+    if (psHighlightIdx >= 0) showProductDetail(psDropdownItems[psHighlightIdx]);
+    else if (psDropdownItems.length === 1) showProductDetail(psDropdownItems[0]);
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    dropdown.style.display = 'none';
+  }
+}
+
+function showProductDetail(product) {
+  psSelectedProduct = product;
+  psPendingBarcode = null;
+  document.getElementById('ps-search').value = product.code;
+  document.getElementById('ps-dropdown').style.display = 'none';
+  document.getElementById('ps-empty').style.display = 'none';
+  document.getElementById('ps-detail').style.display = 'block';
+  document.getElementById('ps-save-row').style.display = 'none';
+  document.getElementById('ps-save-status').style.display = 'none';
+  document.getElementById('ps-code').textContent = product.code;
+  document.getElementById('ps-desc').textContent = product.description;
+  document.getElementById('ps-new-badge').style.display = product.isNew ? 'inline-block' : 'none';
+
+  const barcodeValue = document.getElementById('ps-barcode-value');
+  const barcodeActions = document.getElementById('ps-barcode-actions');
+
+  if (product.barcode) {
+    barcodeValue.textContent = product.barcode;
+    barcodeValue.style.color = '#1a1a1a';
+    barcodeActions.innerHTML = `<span style="font-size:11px;color:var(--success);font-weight:600;">✓ Set</span>`;
+  } else {
+    barcodeValue.textContent = 'No barcode set';
+    barcodeValue.style.color = '#aaa';
+    barcodeActions.innerHTML = `
+      <button class="btn btn-sm btn-secondary" onclick="openScanner('ps-barcode')" style="white-space:nowrap;">
+        📷 Scan EAN
+      </button>`;
+  }
+}
+
+function setPsBarcode(barcode) {
+  if (!psSelectedProduct) return;
+  psPendingBarcode = barcode;
+  document.getElementById('ps-barcode-value').textContent = barcode;
+  document.getElementById('ps-barcode-value').style.color = 'var(--brand)';
+  document.getElementById('ps-barcode-actions').innerHTML =
+    `<span style="font-size:11px;color:var(--brand);font-weight:600;">Pending save</span>`;
+  document.getElementById('ps-save-row').style.display = 'block';
+  document.getElementById('ps-save-status').style.display = 'none';
+}
+
+async function saveProductBarcode() {
+  if (!psSelectedProduct || !psPendingBarcode) return;
+  const btn = document.querySelector('#ps-save-row button');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    // Find the SharePoint item ID for this product
+    const items = await getListItems(CONFIG.listProducts);
+    const match = items.find(i => (i.code || i.Title || '').toUpperCase() === psSelectedProduct.code.toUpperCase());
+    if (!match) throw new Error('Product not found in SharePoint list');
+
+    await updateListItem(CONFIG.listProducts, match.id, { field_2: psPendingBarcode });
+
+    // Update in-memory
+    psSelectedProduct.barcode = psPendingBarcode;
+    productByBarcode[psPendingBarcode] = psSelectedProduct;
+    psPendingBarcode = null;
+
+    document.getElementById('ps-barcode-value').style.color = '#1a1a1a';
+    document.getElementById('ps-barcode-actions').innerHTML =
+      `<span style="font-size:11px;color:var(--success);font-weight:600;">✓ Set</span>`;
+    document.getElementById('ps-save-row').style.display = 'none';
+    document.getElementById('ps-save-status').style.display = 'block';
+    document.getElementById('ps-save-status').textContent = '✓ Barcode saved successfully';
+    toast('Barcode saved ✓', 'success');
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '💾 Save Barcode to Products List';
+    toast('Error saving: ' + e.message, 'error');
+  }
+}
 
 // ============================================================
 // NEW PRODUCT
