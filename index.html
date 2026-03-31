@@ -313,6 +313,7 @@
         <button class="btn btn-secondary" style="flex:1" onclick="goHome()">← Back</button>
         <button class="btn btn-secondary" style="flex:1" onclick="showLiveView()">📋 Stock Take</button>
         <button class="btn btn-secondary" style="flex:1" onclick="showLocationsView()">🗺 Locations</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="showExportPanel()">⬇ Export</button>
         <button class="btn btn-success" style="flex:2" onclick="completeStockTake()" id="complete-btn">
           ✓ Complete
         </button>
@@ -387,6 +388,30 @@
   </div>
 </div>
 
+<!-- EXPORT MODAL -->
+<div id="export-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;padding:16px;display:none;align-items:flex-end;justify-content:center;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:480px;overflow:hidden;margin-bottom:8px;">
+    <div style="background:var(--brand);color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-weight:700;">⬇ Export</div>
+      <button onclick="closeExportModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <button class="btn btn-primary btn-full" onclick="downloadUnleashedCSV();closeExportModal();">
+          ⬇ Unleashed CSV
+        </button>
+        <div style="font-size:11px;color:#888;margin-top:5px;padding:0 4px;">Products grouped together (ignoring batch). 3 columns: Stock Count Number, Product Code, Count Quantity.</div>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-full" onclick="downloadStockTakeCSV();closeExportModal();">
+          ⬇ Stock Take CSV
+        </button>
+        <div style="font-size:11px;color:#888;margin-top:5px;padding:0 4px;">Split by product + batch code. Includes all locations, descriptions, and batch codes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SCANNER OVERLAY -->
 <div id="scanner-overlay">
   <div id="scanner-container">
@@ -405,7 +430,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1188,7 +1213,6 @@ async function completeStockTake() {
 }
 
 async function viewLocationsFromHome(st) {
-  // Load entries for this stock take, then show locations modal
   document.getElementById('locations-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
   document.getElementById('lm-title').textContent = st.Title + ' — Locations';
@@ -1196,15 +1220,22 @@ async function viewLocationsFromHome(st) {
   document.getElementById('lm-body').innerHTML = '<div style="text-align:center;padding:32px;color:#888;"><div class="spinner"></div><br>Loading…</div>';
   try {
     const entries = await getListItems(CONFIG.listEntries, `Title eq '${st.id}'`);
-    const prevEntries = allEntries;
-    const prevST = currentStockTake;
+    // Fully load the stock take into app state so clicking a bay works correctly
     allEntries = entries;
     currentStockTake = st;
-    showLocationsView();
-    // Override close to restore state
+    await loadPreviousEntries();
+    // Mark modal as opened from home so selectLocationFromModal knows to show count view first
     document.getElementById('locations-modal').dataset.fromHome = '1';
-    allEntries = prevEntries;
-    currentStockTake = prevST;
+    showLocationsView();
+    // Update info bar so count view is ready if they click a bay
+    document.getElementById('stocktake-info-bar').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:17px">${st.Title}</div>
+          <div class="text-muted">Stock Take · <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="goHome()">All Stock Takes</button>
+      </div>`;
   } catch(e) {
     document.getElementById('lm-body').innerHTML = `<div style="color:#c62828;padding:16px;">Error: ${e.message}</div>`;
   }
@@ -1295,6 +1326,7 @@ function showSummary() {
           ⬇ Stock Take CSV
         </button>
       </div>
+      <div style="font-size:11px;color:#888;">These buttons are also available at any time via the ⬇ Export button in the toolbar below.</div>
     </div>
     <div class="card">
       <h3>Product Totals</h3>
@@ -1526,6 +1558,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ============================================================
+// EXPORT PANEL
+// ============================================================
+function showExportPanel() {
+  const modal = document.getElementById('export-modal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeExportModal() {
+  document.getElementById('export-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ============================================================
 // LOCATIONS VIEW
 // ============================================================
 function showLocationsView() {
@@ -1600,9 +1645,14 @@ function closeLocationsModal() {
 }
 
 function selectLocationFromModal(locCode) {
+  const fromHome = document.getElementById('locations-modal').dataset.fromHome === '1';
   closeLocationsModal();
+  document.getElementById('locations-modal').dataset.fromHome = '';
+  if (fromHome) {
+    // Navigate into count view first, then select location
+    showView('count');
+  }
   selectLocation(locCode);
-  // Scroll to top of count view
   window.scrollTo(0, 0);
 }
 
