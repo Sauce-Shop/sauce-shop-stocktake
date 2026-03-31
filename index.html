@@ -384,7 +384,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.2.3";
 
 // ============================================================
 // EMBEDDED DATA
@@ -618,7 +618,7 @@ async function getListItems(listName, filter = '') {
       f.ProductCode    = f.field_3 || '';
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
-      f.BatchCode      = f.field_6 || '';
+      f.BatchCode      = f.BatchCode || '';
     }
     return f;
   });
@@ -1070,14 +1070,15 @@ async function addProductEntry() {
 async function saveEntry(productCode, productDesc, qty, batch = '') {
   try {
     const entry = await createListItem(CONFIG.listEntries, {
-      Title:   currentStockTake.id,    // StockTakeId
-      field_1: currentStockTake.Title, // StockTakeName
-      field_2: currentLocation,        // LocationCode
-      field_3: productCode,            // ProductCode
-      field_4: productDesc || '',      // ProductDescription
-      field_5: qty,                    // CountQty
-      field_6: batch || ''             // BatchCode
+      Title:     currentStockTake.id,    // StockTakeId
+      field_1:   currentStockTake.Title, // StockTakeName
+      field_2:   currentLocation,        // LocationCode
+      field_3:   productCode,            // ProductCode
+      field_4:   productDesc || '',      // ProductDescription
+      field_5:   qty,                    // CountQty
+      BatchCode: batch || ''             // BatchCode
     });
+
     // Push with friendly names so the rest of the app works
     allEntries.push({
       id: entry.id,
@@ -1097,6 +1098,7 @@ async function saveEntry(productCode, productDesc, qty, batch = '') {
       currentStockTake.EntryCount = allEntries.length;
     } catch {}
   } catch (e) {
+    console.error('saveEntry failed:', e);
     toast('Error saving: ' + e.message, 'error');
   }
 }
@@ -1110,7 +1112,7 @@ async function updateQty(entryId, newQty, batch = '', silent = false) {
   entry.CountQty = qty;
   if (batch) entry.BatchCode = batch;
   const fields = { field_5: qty };
-  if (batch) fields.field_6 = batch;
+  if (batch) fields.BatchCode = batch;
   try {
     await updateListItem(CONFIG.listEntries, entryId, fields);
     if (!silent) toast('Quantity updated', 'success');
