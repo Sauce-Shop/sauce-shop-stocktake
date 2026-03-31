@@ -384,7 +384,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.2.3";
+const APP_VERSION = "1.3.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1041,20 +1041,23 @@ function selectProduct(product) {
 async function addProductEntry() {
   if (!selectedProduct || !currentLocation) return;
   const qty = parseInt(document.getElementById('add-qty').value) || 0;
+  const batch = document.getElementById('add-batch').value.trim().toUpperCase();
 
-  // Check if already exists in this location
-  const existing = locationEntries.find(e => e.ProductCode === selectedProduct.code);
+  // Match on BOTH product code AND batch code — different batches = separate lines
+  const existing = locationEntries.find(e =>
+    e.ProductCode === selectedProduct.code &&
+    (e.BatchCode || '') === batch
+  );
+
   if (existing) {
-    // Update quantity instead
+    // Same product + same batch in same location — add to existing qty
     const newQty = existing.CountQty + qty;
-    const batch = document.getElementById('add-batch').value.trim().toUpperCase();
-    if (batch) existing.BatchCode = batch; // update batch if provided
     await updateQty(existing.id, newQty, batch, true);
-    toast(`Updated ${selectedProduct.code}: ${newQty}`, 'success');
+    toast(`Updated ${selectedProduct.code} (${batch || 'no batch'}): qty now ${newQty}`, 'success');
   } else {
-    const batch = document.getElementById('add-batch').value.trim().toUpperCase();
+    // New product or different batch — always create a new line
     await saveEntry(selectedProduct.code, selectedProduct.description, qty, batch);
-    toast(`Added ${selectedProduct.code}`, 'success');
+    toast(`Added ${selectedProduct.code}${batch ? ' · ' + batch : ''}`, 'success');
   }
 
   // Reset
@@ -1206,23 +1209,26 @@ async function viewSummary(st) {
 }
 
 function showSummary() {
-  // Aggregate: total qty per product code, collect all locations
+  // Group by ProductCode + BatchCode
   const totals = {};
   allEntries.forEach(e => {
-    const code = e.ProductCode;
-    if (!totals[code]) {
-      totals[code] = {
-        code,
+    const key = `${e.ProductCode}||${e.BatchCode || ''}`;
+    if (!totals[key]) {
+      totals[key] = {
+        code: e.ProductCode,
         description: e.ProductDescription || '',
+        batch: e.BatchCode || '',
         total: 0,
         locations: new Set()
       };
     }
-    totals[code].total += parseInt(e.CountQty) || 0;
-    totals[code].locations.add(e.LocationCode);
+    totals[key].total += parseInt(e.CountQty) || 0;
+    totals[key].locations.add(e.LocationCode);
   });
 
-  const rows = Object.values(totals).sort((a, b) => a.code.localeCompare(b.code));
+  const rows = Object.values(totals).sort((a, b) =>
+    a.code.localeCompare(b.code) || a.batch.localeCompare(b.batch)
+  );
   const totalLines = rows.length;
   const totalQty = rows.reduce((s, r) => s + r.total, 0);
 
@@ -1267,20 +1273,22 @@ function showSummary() {
 }
 
 function downloadCSV() {
-  // Aggregate
+  // Group by ProductCode + BatchCode — same product + same batch = one line
+  // Different batches = separate lines, locations comma-separated
   const totals = {};
   allEntries.forEach(e => {
-    const code = e.ProductCode;
-    if (!totals[code]) {
-      totals[code] = {
-        code,
+    const key = `${e.ProductCode}||${e.BatchCode || ''}`;
+    if (!totals[key]) {
+      totals[key] = {
+        code: e.ProductCode,
         description: e.ProductDescription || '',
+        batch: e.BatchCode || '',
         total: 0,
         locations: new Set()
       };
     }
-    totals[code].total += parseInt(e.CountQty) || 0;
-    totals[code].locations.add(e.LocationCode);
+    totals[key].total += parseInt(e.CountQty) || 0;
+    totals[key].locations.add(e.LocationCode);
   });
 
   const headers = [
@@ -1292,20 +1300,25 @@ function downloadCSV() {
     'Supplier',
     'Bin Location',
     'Base Unit of Measure',
-    'Pack Size'
+    'Pack Size',
+    'Batch'
   ];
 
-  const rows = Object.values(totals).sort((a, b) => a.code.localeCompare(b.code));
+  const rows = Object.values(totals).sort((a, b) =>
+    a.code.localeCompare(b.code) || a.batch.localeCompare(b.batch)
+  );
+
   const csvRows = rows.map(r => [
     csvEscape(currentStockTake.Title),
     csvEscape(r.code),
     r.total,
     csvEscape(r.description),
-    '',  // Product Group — not in source data
-    '',  // Supplier — not in source data
+    '',  // Product Group
+    '',  // Supplier
     csvEscape([...r.locations].join(', ')),
     '',  // Base Unit of Measure
-    ''   // Pack Size
+    '',  // Pack Size
+    csvEscape(r.batch)
   ]);
 
   const csv = [headers, ...csvRows].map(row => row.join(',')).join('\r\n');
