@@ -227,6 +227,9 @@
       <div class="card" id="stocktake-info-bar">
         <!-- filled dynamically -->
       </div>
+      <div id="product-loading" style="display:none;background:#fff8f6;border:1px solid #ffd0c0;border-radius:8px;padding:10px 14px;font-size:13px;color:#e8401c;margin-bottom:4px;">
+        ⏳ Loading product list from SharePoint…
+      </div>
 
       <!-- Location scan -->
       <div class="card">
@@ -270,7 +273,10 @@
           <div class="divider"></div>
 
           <!-- Add product -->
-          <h3>+ Add Product</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="margin-bottom:0;">+ Add Product</h3>
+            <button class="btn btn-secondary btn-sm" onclick="showNewProductModal()" title="Add a product not in the list">+ New Product</button>
+          </div>
           <div class="input-with-btn" style="margin-bottom:10px">
             <div class="search-wrapper" style="flex:1">
               <input type="text" id="product-search" placeholder="Scan EAN or type product code…"
@@ -340,6 +346,10 @@
           <input type="text" id="sp-list-entries" placeholder="StockTakeEntries" value="StockTakeEntries">
         </div>
         <div class="form-group">
+          <label>Products List Name</label>
+          <input type="text" id="sp-list-products" placeholder="Products" value="Products">
+        </div>
+        <div class="form-group">
           <label>Azure App Client ID</label>
           <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
         </div>
@@ -388,6 +398,35 @@
   </div>
 </div>
 
+<!-- NEW STOCK TAKE MODAL -->
+<div id="new-stocktake-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:420px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:16px 20px;">
+      <div style="font-weight:800;font-size:17px;">New Stock Take</div>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Stock Count Number (from Unleashed)</label>
+        <input type="text" id="new-st-name" placeholder="e.g. ST-00000005"
+          autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+        <div style="font-size:11px;color:#888;margin-top:4px;">Create the count in Unleashed first and copy the ST number.</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Warehouse</label>
+        <select id="new-st-warehouse">
+          <option value="">— Select warehouse —</option>
+          <option value="unit2">Unit 2 Warehouse</option>
+          <option value="unit3">Unit 3 Production</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('new-stocktake-modal').style.display='none'">Cancel</button>
+        <button class="btn btn-primary" style="flex:2" onclick="confirmCreateStockTake()">Create Stock Take</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- EXPORT MODAL -->
 <div id="export-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;padding:16px;display:none;align-items:flex-end;justify-content:center;">
   <div style="background:white;border-radius:12px;width:100%;max-width:480px;overflow:hidden;margin-bottom:8px;">
@@ -412,6 +451,37 @@
   </div>
 </div>
 
+<!-- NEW PRODUCT MODAL -->
+<div id="new-product-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:420px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-weight:800;font-size:16px;">+ New Product</div>
+      <button onclick="closeNewProductModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:12px;color:#888;background:#fff8f6;border:1px solid #ffd0c0;border-radius:6px;padding:10px;">
+        Use this for products not yet in the system. They will be added to the count but will need adding to Unleashed separately before import.
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Product Code <span style="color:#c62828">*</span></label>
+        <input type="text" id="np-code" placeholder="e.g. SS-NEW001" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Description <span style="color:#c62828">*</span></label>
+        <input type="text" id="np-desc" placeholder="e.g. New Sauce 300g" autocomplete="off">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>EAN / Barcode <span style="color:#888;font-weight:400;">(optional)</span></label>
+        <input type="text" id="np-barcode" placeholder="e.g. 5060604099999" autocomplete="off" inputmode="numeric">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeNewProductModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2" onclick="saveNewProduct()">Add to Count</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SCANNER OVERLAY -->
 <div id="scanner-overlay">
   <div id="scanner-container">
@@ -430,13 +500,17 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.4.2";
+const APP_VERSION = "1.6.0";
 
 // ============================================================
 // EMBEDDED DATA
 // ============================================================
-const PRODUCTS = [{"code": "AR-HSD10(S)", "description": "Archies Honey Sriracha Drizzle 10 KG", "barcode": "5060604013566"}, {"code": "BATCH-ABH", "description": "Batch - Atomic Buffalo", "barcode": ""}, {"code": "BATCH-AHS", "description": "Batch - Amarillo Hot Sauce", "barcode": ""}, {"code": "BATCH-AMJ", "description": "Batch - Amarillo Jam", "barcode": ""}, {"code": "BATCH-BC", "description": "Batch - Bunk Chipotle", "barcode": ""}, {"code": "BATCH-BH", "description": "Batch - Bunk Habanero", "barcode": ""}, {"code": "BATCH-BHB", "description": "Batch - Bunk Hot Bbq", "barcode": ""}, {"code": "BATCH-BHC", "description": "Batch - Buffalo Hot Concentrate", "barcode": ""}, {"code": "BATCH-BHS", "description": "Batch - Buffalo Hot Sauce", "barcode": ""}, {"code": "BATCH-BKH", "description": "Batch - Brussel Kimchi Hot Sauce", "barcode": ""}, {"code": "BATCH-BM", "description": "Batch - Bunk Mango", "barcode": ""}, {"code": "BATCH-BNC", "description": "Batch - Bunk Naga Chilli", "barcode": ""}, {"code": "BATCH-BPH", "description": "Batch - Burnt Pineapple Hot Sauce", "barcode": ""}, {"code": "BATCH-BRS", "description": "Batch - Brown Sauce", "barcode": ""}, {"code": "BATCH-BS", "description": "Batch - Burger Sauce", "barcode": ""}, {"code": "BATCH-CHH", "description": "Batch - Cranberry Hot Honey", "barcode": ""}, {"code": "BATCH-CHS", "description": "Batch - Chimicurri Hot Sauce", "barcode": ""}, {"code": "BATCH-CMA", "description": "Batch - Chipotle Mayonnaise", "barcode": ""}, {"code": "BATCH-GBH", "description": "Batch - Gochujang Buffalo Hot Sauce", "barcode": ""}, {"code": "BATCH-GCI", "description": "Batch - Golden Coconut Curry Cook In", "barcode": ""}, {"code": "BATCH-GFR", "description": "Batch - Guajillo Flakes", "barcode": ""}, {"code": "BATCH-GMA", "description": "Batch - Garlic Mayonnaise", "barcode": ""}, {"code": "BATCH-HCB", "description": "Batch - Honey Chipotle Bbq", "barcode": ""}, {"code": "BATCH-HCB-CAM", "description": "Batch - Honey Chipotle Bbq - Camstar", "barcode": ""}, {"code": "BATCH-HHS", "description": "Batch - Habanero Hot Sauce", "barcode": ""}, {"code": "BATCH-HMA", "description": "Batch - Hot Honey Aioli", "barcode": ""}, {"code": "BATCH-HMB", "description": "Batch - Honey Mustard Bbq", "barcode": ""}, {"code": "BATCH-HSD", "description": "Batch - Honey Sriracha Drizzle", "barcode": ""}, {"code": "BATCH-HSR", "description": "Batch - House Seasoning", "barcode": ""}, {"code": "BATCH-JFR", "description": "Batch - Green Jalapeno Flakes", "barcode": ""}, {"code": "BATCH-MCB", "description": "Batch - Maple Cajun Bbq", "barcode": ""}, {"code": "BATCH-MCI", "description": "Batch - Makhani Cook In", "barcode": ""}, {"code": "BATCH-MTB", "description": "Batch - Miso Teryaki Bbq Sauce", "barcode": ""}, {"code": "BATCH-OBR", "description": "Batch - Original Bbq Rub", "barcode": ""}, {"code": "BATCH-OBS", "description": "Batch - Original Bbq", "barcode": ""}, {"code": "BATCH-OHS", "description": "Batch - Original Hot Sauce", "barcode": ""}, {"code": "BATCH-OMA", "description": "Batch - Original Mayonnaise", "barcode": ""}, {"code": "BATCH-PEH", "description": "Batch - Peach Habanero", "barcode": ""}, {"code": "BATCH-PHH", "description": "Batch - Pineapple Habanero Hot Sauce", "barcode": ""}, {"code": "BATCH-PRH", "description": "Batch - Piri Piri Hot Sauce", "barcode": ""}, {"code": "BATCH-PTR", "description": "Batch - Pizza Pasta Topping", "barcode": ""}, {"code": "BATCH-RCI", "description": "Batch - Ranchero Cook In", "barcode": ""}, {"code": "BATCH-RMA", "description": "Batch - Ranch Mayonnaise", "barcode": ""}, {"code": "BATCH-SBH", "description": "Batch - Smoky Maple Buffalo Hot Sauce", "barcode": ""}, {"code": "BATCH-SBJ", "description": "Batch - 12:51 Scotch Bonnet Jam", "barcode": ""}, {"code": "BATCH-SBR", "description": "Batch - Smokey Chipotle Rub", "barcode": ""}, {"code": "BATCH-SBS", "description": "Batch - Spicy Breakfast Sauce", "barcode": ""}, {"code": "BATCH-SCB", "description": "Batch - South Carolina Mustard Bbq", "barcode": ""}, {"code": "BATCH-SCI", "description": "Batch - Spicy Marinara Cook In", "barcode": ""}, {"code": "BATCH-SRI", "description": "Batch - Sriracha Chilli Sauce", "barcode": ""}, {"code": "BATCH-TBH", "description": "Batch - Truffalo Hot Sauce", "barcode": ""}, {"code": "BATCH-TBP", "description": "Batch - Truffle & Black Pepper Simmer Sauce", "barcode": ""}, {"code": "BATCH-TBQ", "description": "Batch - Truffle Bbq", "barcode": ""}, {"code": "BATCH-TCI", "description": "Batch - Mother Tomato Cook In", "barcode": ""}, {"code": "BATCH-THH", "description": "Batch - Truffle Hot Honey", "barcode": ""}, {"code": "BATCH-TKE", "description": "Batch - Tomato Ketchup", "barcode": ""}, {"code": "BATCH-TMA", "description": "Batch - Truffle Mayonnaise", "barcode": ""}, {"code": "BATCH-WCI", "description": "Batch - Southwest Chilli Cook In", "barcode": ""}, {"code": "FP0000", "description": "House Seasoning 190g", "barcode": ""}, {"code": "FP0001", "description": "House Seasoning 190g", "barcode": ""}, {"code": "IN0000", "description": "Anti Bac Hand Soap (5L)", "barcode": ""}, {"code": "IN0001", "description": "Anti Bac Hand Soap (5L)", "barcode": ""}, {"code": "IN0002", "description": "SOLABAC DEGREASER/SANITISER IN ONE", "barcode": ""}, {"code": "IN0003", "description": "Dishwasher Cleaning Agent", "barcode": ""}, {"code": "IN0004", "description": "Hand Sanitiser Tub (5L)", "barcode": ""}, {"code": "IN0005", "description": "Washing Up Liquid (5L)", "barcode": ""}, {"code": "IN0006", "description": "Citronix Cleaning Fluid", "barcode": ""}, {"code": "IN0007", "description": "1ltr BARRIER CREAM - DEB PROTECT DEB207", "barcode": ""}, {"code": "IN0008", "description": "SOLABAC DEGREASER/SANITISER IN ONE (MOQ 2x5ltr)", "barcode": ""}, {"code": "IN0009", "description": "TOILET CLEANER 12 x 6ltr", "barcode": ""}, {"code": "IN0010", "description": "TOILET CLEANER 5ltr", "barcode": ""}, {"code": "IN0011", "description": "HARD SURFACE POLISH 6 X 750ml", "barcode": ""}, {"code": "IN0012", "description": "THICK BLEACH 5ltr", "barcode": ""}, {"code": "IN0013", "description": "Heavy Duty Black Sacks 18x33x39 Merlin (1x200 Bags)", "barcode": ""}, {"code": "IN0014", "description": "Scourers Foam Back (Standard) (Pack of 10)", "barcode": ""}, {"code": "IN0015", "description": "Floor Cleaner", "barcode": ""}, {"code": "IN0016", "description": "Window Mirror & Plastic Cleaner", "barcode": ""}, {"code": "IN0017", "description": "WASHROOM CLEANER", "barcode": ""}, {"code": "IN0018", "description": "BLUE ROLLS (Pack of 6)", "barcode": ""}, {"code": "IN0019", "description": "2 PLY BLUE ROLL FOR TOWEL DISPENSER", "barcode": ""}, {"code": "IN0020", "description": "Toilet Tissue Triple Soft (10 x 4 Rolls)", "barcode": ""}, {"code": "IN1000", "description": "PH4 Buffer Solution (Red) (UN NR) 1ltr", "barcode": ""}, {"code": "IN1001", "description": "PH7 Buffer Solution (Yellow) (UN NR) 1ltr", "barcode": ""}, {"code": "IN1002", "description": "Electrode Storage Solution General Purpose 500ml", "barcode": ""}, {"code": "IN1003", "description": "PREPLACEMENT pH PROBE FOR ETI 8100", "barcode": ""}, {"code": "IN1004", "description": "ETI8000 Recalibrate / within spec test", "barcode": ""}, {"code": "IN1005", "description": "ETI8100 Recalibration", "barcode": ""}, {"code": "IN1006", "description": "Electrode Cleaning Solution General Purpose 500ml", "barcode": ""}, {"code": "IN1007", "description": "Thermapen Recalibration", "barcode": ""}, {"code": "IN1008", "description": "ALLERGEN ALERTOX SWAB", "barcode": ""}, {"code": "IN1009", "description": "ATP Swabs", "barcode": ""}, {"code": "IN1010", "description": "De-ionised Water 25 Litre", "barcode": ""}, {"code": "IN2000", "description": "BEARD SNOODS", "barcode": ""}, {"code": "IN2001", "description": "NITRILE GLOVES SMALL", "barcode": ""}, {"code": "IN2002", "description": "NITRILE GLOVES MEDIUM", "barcode": ""}, {"code": "IN2003", "description": "NITRILE GLOVES LARGE", "barcode": ""}, {"code": "IN2004", "description": "BLUE POLYTHENE OVERSLEEVE", "barcode": ""}, {"code": "IN2005", "description": "Vinyl Glove Blue P/Free", "barcode": ""}, {"code": "IN2006", "description": "LONG PVC SLEEVED GLOVE 23201", "barcode": ""}, {"code": "IN2007", "description": "HAIR NETS (Pack of 100)", "barcode": ""}, {"code": "IN2008", "description": "HAIR NETS (Pack of 100)", "barcode": ""}, {"code": "IN2009", "description": "COOKHOUSE BOOTS SIZE 10", "barcode": ""}, {"code": "IN2010", "description": "COOKHOUSE BOOTS SIZE 9", "barcode": ""}, {"code": "IN2011", "description": "NR FACEMASK", "barcode": ""}, {"code": "IN2012", "description": "COOKHOUSE TROUSERS MEDIUM", "barcode": ""}, {"code": "IN2013", "description": "COOKHOUSE TROUSERS XL", "barcode": ""}, {"code": "IN2014", "description": "COOKHOUSE TROUSERS SMALL", "barcode": ""}, {"code": "IN2015", "description": "Goggles Anti Fog Anti Scratch BBSG604", "barcode": ""}, {"code": "IN2016", "description": "GLOVEZILLA LATEX THERMAL GLOVE GZ105OR x10 MEDIUM", "barcode": ""}, {"code": "IN2017", "description": "HIGH VIS ORANGE VEST SMALL WCENGORS", "barcode": ""}, {"code": "IN2018", "description": "HIGH VIS ORANGE VEST MEDIUM WCENGORM", "barcode": ""}, {"code": "IN2019", "description": "HIGH VIS ORANGE VEST LARGE WCENGORL", "barcode": ""}, {"code": "IN2020", "description": "HIGH VIS ORANGE VEST XL WCENGORXL", "barcode": ""}, {"code": "IN2021", "description": "HIGH VIS ORANGE VEST XXL WCENGORXXL", "barcode": ""}, {"code": "IN2022", "description": "PRODUCTION WELLINGTONS SIZE 8", "barcode": ""}, {"code": "IN2023", "description": "WELLINGTON INSOLE", "barcode": ""}, {"code": "IN2024", "description": "RESPIRATOR MASK", "barcode": ""}, {"code": "IN2025", "description": "First Aid Kit 10 Person Refill CM0011", "barcode": ""}, {"code": "IN2026", "description": "NYPLAX APRON D/BLUE 48x36 PK10", "barcode": ""}, {"code": "IN2027", "description": "Blue Detectable Tape 2.5cm x 5m", "barcode": ""}, {"code": "IN2028", "description": "Burn Dressing", "barcode": ""}, {"code": "IN2029", "description": "Warehouse Coat (No External Pockets)", "barcode": ""}, {"code": "IN2030", "description": "Ansell 92-600 Touch N Tuff Powder Free Gloves", "barcode": ""}, {"code": "IN2031", "description": "Safety Glasses", "barcode": ""}, {"code": "IN2032", "description": "BLUE DETECTABLE PLASTERS 120 BULK PACK", "barcode": ""}, {"code": "IN2033", "description": "EYEWASH POD STATION", "barcode": ""}, {"code": "IN2034", "description": "EYEWASHPODS PACK OF 25 x 20ML", "barcode": ""}, {"code": "IN2035", "description": "BURN KIT", "barcode": ""}, {"code": "IN2036", "description": "BURN GEL KIT TOP UP - SACHET x 20", "barcode": ""}, {"code": "IN2037", "description": "BURN GEL TOP UP KIT - BURN GEL 59ml", "barcode": ""}, {"code": "IN2038", "description": "WAREHOUSE SHOES", "barcode": ""}, {"code": "IN2039", "description": "WAREHOUSE SHOES SIZE 9", "barcode": ""}, {"code": "IN2040", "description": "WAREHOUSE SHOES SIZE 10", "barcode": ""}, {"code": "IN2041", "description": "WAREHOUSE SHOE SIZE 7", "barcode": ""}, {"code": "IN3000", "description": "BLUE OCTOPUS FOOD SAFE SCOURERS", "barcode": ""}, {"code": "IN3001", "description": "400mm SQEEGEE HEAD", "barcode": ""}, {"code": "IN3002", "description": "600mm SQUEEGEE HEAD", "barcode": ""}, {"code": "IN3003", "description": "MOP HEAD HYGIEMIX BLUE 250 GRAM", "barcode": ""}, {"code": "IN3004", "description": "4m TELESCOPIC POLE", "barcode": ""}, {"code": "IN3005", "description": "FLAT MOP FRAME", "barcode": ""}, {"code": "IN3006", "description": "DISPAD", "barcode": ""}, {"code": "IN3007", "description": "GRIDDLE PAD HOLDER", "barcode": ""}, {"code": "IN3008", "description": "GRIDDLE SCREEN", "barcode": ""}, {"code": "IN3009", "description": "GRIDDLE SCOURER", "barcode": ""}, {"code": "IN3010", "description": "OCTOPUS CLEANING TOOL", "barcode": ""}, {"code": "IN3011", "description": "HANDLE UNIVERSAL ABBEY HYGIENE 54\" BLUE", "barcode": ""}, {"code": "IN3012", "description": "MOP BUCKET AND ROSE 12L", "barcode": ""}, {"code": "IN3013", "description": "BOTTLE POLYETHYLENE LABEL 600CC 975", "barcode": ""}, {"code": "IN3014", "description": "SPRAY TRIGGER HEAD WHITE/WHITE", "barcode": ""}, {"code": "IN3015", "description": "Universal Abbey Handle 54\"", "barcode": ""}, {"code": "IN3016", "description": "Handle - Ergonomic one piece", "barcode": ""}, {"code": "IN3017", "description": "Tank Brush Head", "barcode": ""}, {"code": "IN3018", "description": "Nylon Blade Large Pan Scraper", "barcode": ""}, {"code": "IN3019", "description": "60mm 2130mm BLUE BRUSH", "barcode": ""}, {"code": "IN3020", "description": "123210 HONEYCOMB METAL PAPER DISPENSER", "barcode": ""}, {"code": "IN3021", "description": "CHEM5 DISPENSER - DEB173", "barcode": ""}, {"code": "IN3022", "description": "Hygienic Factory Magnet", "barcode": ""}, {"code": "IN3023", "description": "Paddle - Long S/s Pole With Holes Blue", "barcode": ""}, {"code": "IN3024", "description": "Thermapen Thermometer", "barcode": ""}, {"code": "IN3025", "description": "DETECTABLE NON RETRACTABLE PEN BOX OF 50", "barcode": ""}, {"code": "IN3026", "description": "SK109 DETECTABLE SAFETY KNIFE BOX OF 5", "barcode": ""}, {"code": "IN3027", "description": "DETECTAMET DETECTABLE BUCKET 12L WITH LID", "barcode": ""}, {"code": "IN3028", "description": "Metal Detectable Stackable Scooping Jug", "barcode": ""}, {"code": "IN3029", "description": "Metal Detectable Plastic Handle Scraper with Brass Blade", "barcode": ""}, {"code": "IN3030", "description": "LOBBY DUSTPAN AND BRUSH BLUE", "barcode": ""}, {"code": "IN3031", "description": "DETECTABLE WHITEBOARD MARKER", "barcode": ""}, {"code": "IN3032", "description": "Emerito 7404 V Bel", "barcode": ""}, {"code": "IN3033", "description": "Wet Floor Sign", "barcode": ""}, {"code": "IN3034", "description": "Heavy Duty Waste Bin - 85 Ltr Red", "barcode": ""}, {"code": "IN3035", "description": "Detectable pen - retractable with pocket clip and lanyard loop blue ink x25", "barcode": ""}, {"code": "IN3036", "description": "Detectable Permanent Marker Pens X 10 - Red Ink", "barcode": ""}, {"code": "IN3037", "description": "Euro Stacking Recycled Plastic Container", "barcode": ""}, {"code": "IN3038", "description": "Paddle - One Piece with Holes Blue Code: P7808-BL", "barcode": ""}, {"code": "IN3039", "description": "Detectable Dry Wipe Markers Red (x10) Code: P8910-RD", "barcode": ""}, {"code": "IN3040", "description": "Detectable Dry Wipe Markers Green (x10) Code: P8910-GN", "barcode": ""}, {"code": "IN3041", "description": "Dishwasher Service", "barcode": ""}, {"code": "IN3042", "description": "VITON O-RING 9.19 X 2.62 x 20 BS110-V75", "barcode": ""}, {"code": "IN3043", "description": "50-00085 - FLANGED BEARING", "barcode": ""}, {"code": "IN3044", "description": "07-01037 - IDLE SPROCKET PLINTH", "barcode": ""}, {"code": "IN3045", "description": "LF880 K450 FLAT TOP CHAIN (10' BOX)", "barcode": ""}, {"code": "IN3046", "description": "Outlet Viton O-rings to suit ADILS-20 High Shear Inline Mixer", "barcode": ""}, {"code": "IN3047", "description": "XTA5300 3\" bore x 1.8m over all length red suction delivery (405LH) complete with  RJT female on one end and a 3\" RJT  female on 90degree elbow", "barcode": ""}, {"code": "IN3048", "description": "Valves - 3\" - RJT - Male/Female - 316", "barcode": ""}, {"code": "IN3049", "description": "VITON SHAFT SEAL - STANDARD COV- RIGGS PART No.111355", "barcode": ""}, {"code": "IN3050", "description": "VITON STANDARD CUT OFF HOUSING SEAL-RIGGS PART NO.214115-055", "barcode": ""}, {"code": "IN3051", "description": "2", "barcode": ""}, {"code": "IN3052", "description": "VITON O-RING 29.83 X 2.62 BS123-V75", "barcode": ""}, {"code": "IN3053", "description": "VITON PISTON HEAD SEAL- RIGGS PART NO 214115-050", "barcode": ""}, {"code": "IN3054", "description": "NITRILE CUP SUPPORT O-RING (50-600ml)- RIGGS PART NO. 100938", "barcode": ""}, {"code": "IN3055", "description": "NITRILE END CAP SEAL- UP TO \u00d84.000\"- RIGGS PART NO. 100971", "barcode": ""}, {"code": "IN3056", "description": "NITRILE ROTOR SPIGOT SEAL- RIGGS PART NO. 101427", "barcode": ""}, {"code": "IN3057", "description": "NITRILE FLANGE SEAL UP TO \u00d84.000\" - RIGGS PART NO. 101428", "barcode": ""}, {"code": "IN3058", "description": "TBC", "barcode": ""}, {"code": "IN3059", "description": "3 2 3/8\" BSP FLAT TOP SILENCER- RIGGS PART NO. 112605", "barcode": ""}, {"code": "IN3060", "description": "TBC", "barcode": ""}, {"code": "IN3061", "description": "SILICONE LUBRICANT", "barcode": ""}, {"code": "IN3062", "description": "AMBERGREASE FG3 AMBERSIL-30258-AA-380G", "barcode": ""}, {"code": "IN3063", "description": "TBC", "barcode": ""}, {"code": "IN3064", "description": "2\" Tri clover seal EPDM- RIGGS PART NO 111005", "barcode": ""}, {"code": "IN3065", "description": "-110773  Digital position indicator Standard", "barcode": ""}, {"code": "IN3066", "description": "110793  2\" RJT seal EPDM", "barcode": ""}, {"code": "IN3067", "description": "A05-05-556  LCOV shaft", "barcode": ""}, {"code": "IN3068", "description": "A05-05-557  Shoulder screw", "barcode": ""}, {"code": "IN3069", "description": "A05-05-558  Valve head PTFE", "barcode": ""}, {"code": "IN3070", "description": "REPLACEMENT FOAM ON RETURNED PAD", "barcode": ""}, {"code": "IN3071", "description": "03-01005 - FULL SPOOL DISC 300MM", "barcode": ""}, {"code": "IN3072", "description": "3inch RJT seal (RJTS3)", "barcode": ""}, {"code": "IN3073", "description": "CHAIN LUBE FG AMBERSIL-30245-AA-400ML", "barcode": ""}, {"code": "IN3074", "description": "1.5\" Tri clover seal check valve RIGGS PART NO. 113409", "barcode": ""}, {"code": "IN3075", "description": "Shell Heat Transfer Oil S2 209 L", "barcode": ""}, {"code": "IN3076", "description": "Valve Handle to suit 3\" RTJ Valve", "barcode": ""}, {"code": "IN3077", "description": "Valve Body Seal - 3\" - RJT - EPDM Black", "barcode": ""}, {"code": "IN3078", "description": "IBC Adaptor to Camlock 60 mm IBC Adaptor to 2 inch Male Camlock", "barcode": ""}, {"code": "IN3079", "description": "Tommy bar Std for Riggs Depositor A10-11-442", "barcode": ""}, {"code": "IN3080", "description": "Bluelight Sensor Background Supression", "barcode": ""}, {"code": "IN3081", "description": "4\" Cup seal PTFE for Std Riggs Depositor A10-10-098", "barcode": ""}, {"code": "IN3082", "description": "Retroreflective Photoelectric Sensor 200m Detection Range", "barcode": ""}, {"code": "IN3083", "description": "PRO Stainless Steel Pipe Fitting Straight Circular 61mm", "barcode": ""}, {"code": "IN3084", "description": "FOOD GREASE FG AMBERSIL-30259-AA-400ML", "barcode": ""}, {"code": "IN3085", "description": "#N/A", "barcode": ""}, {"code": "IN3086", "description": "#N/A", "barcode": ""}, {"code": "IN3087", "description": "3/8\" 10mm Push Fit Elbow FES-153052 (5 Pack)", "barcode": ""}, {"code": "IN3088", "description": "1/2\" 10mm Push Fit Elbow FES-190661 (5 pack)", "barcode": ""}, {"code": "IN3089", "description": "GREEN POLYCORD BELTING POL-8-MTR (2 metres)", "barcode": ""}, {"code": "IN3090", "description": "07-01032 - SPROCKET PLATE WHEEL 16T X 4MM", "barcode": ""}, {"code": "IN4000", "description": "CHARGE", "barcode": ""}, {"code": "IN4001", "description": "TRANSPORT", "barcode": ""}, {"code": "IN4002", "description": "CHEP PALLET", "barcode": ""}, {"code": "IN5000", "description": "BM TOOLING AND ORIGINATION", "barcode": ""}, {"code": "IN6000", "description": "Marketing Campaign", "barcode": ""}, {"code": "IN8000", "description": "Pro-series Tape Gun", "barcode": ""}, {"code": "MASH1", "description": "Batch - Red Jalapeno Mash", "barcode": ""}, {"code": "MASH4", "description": "Batch - Red Habanero Mash", "barcode": ""}, {"code": "MASH5", "description": "Batch - Garlic Mash", "barcode": ""}, {"code": "ME0000", "description": "Sauce Caddy", "barcode": ""}, {"code": "ME0001", "description": "Sauce Caddy", "barcode": ""}, {"code": "ME0002", "description": "ZIPPED BRANDED BAGS", "barcode": ""}, {"code": "ME0003", "description": "MERCH10 MOQ1000 DELIVERY - DOUBLE CHECK PALLET QUANTITY", "barcode": ""}, {"code": "ME0004", "description": "MERCH10 SET UP COST ADDED TO EVERY ORDER", "barcode": ""}, {"code": "ME0005", "description": "SS-BLDP Black Label Dip Pots (2 Pack)", "barcode": ""}, {"code": "ME0006", "description": "SS-WLDP White Label Dip Pots", "barcode": ""}, {"code": "PE0000", "description": "E-Commerce 12 Pack", "barcode": ""}, {"code": "PE0001", "description": "E-Commerce 12 Pack Dividers", "barcode": ""}, {"code": "PE0002", "description": "E-Commerce 12 Pack Base and Top Pads", "barcode": ""}, {"code": "PE0003", "description": "Gift Pack (2 Pack)", "barcode": ""}, {"code": "PE0004", "description": "MINI TUB 6 PACK 1000 PRICE BREAK", "barcode": ""}, {"code": "PE0005", "description": "MINI TUB 2 PACK 1200 PRICE BREAK", "barcode": ""}, {"code": "PE0006", "description": "XMAS 2 Pack Gift Box", "barcode": ""}, {"code": "PE0007", "description": "MEDIUM SHIPPING 408x213x103 120WTT/110hiB/110T", "barcode": ""}, {"code": "PE0008", "description": "LARGE GIFT BOX 450 x 380 x 220 150K/150T BC D/W", "barcode": ""}, {"code": "PE0009", "description": "LARGE GIFT BOX OUTER 455 x 360 x 163 150K/150T BC D/W", "barcode": ""}, {"code": "PE0010", "description": "12 SHIPPING 408x213x206 125WK/125T BC D/W", "barcode": ""}, {"code": "PE0011", "description": "Hamper Gift Box Outer", "barcode": ""}, {"code": "PE0012", "description": "420x327x207 8 Case Shipping Box", "barcode": ""}, {"code": "PE0013", "description": "12\"x9\"x4\" Single Wall Box", "barcode": ""}, {"code": "PE-PHH2(S)", "description": "Pineapple Habanero Hot Sauce 2.3 KG", "barcode": "5060604013498"}, {"code": "PK1000", "description": "Honey Chipotle BBQ Sauce 104x160mm - V: 03.11.21", "barcode": ""}, {"code": "PK1001", "description": "(FRONT) Scotch Bonnet Jam 95x60mm - V: 09.02.22", "barcode": ""}, {"code": "PK1002", "description": "(FRONT) Honey Sriracha Drizzle 95x60mm - V: 09.02.22", "barcode": ""}, {"code": "PK1003", "description": "Original BBQ 255g label", "barcode": ""}, {"code": "PK1004", "description": "Scotch Bonnet Jam Mini Jar  43mmX205mm 19.07.22 SSSBJ240B", "barcode": ""}, {"code": "PK1005", "description": "Amarillo Chilli Jam Mini Jar  43mmX205mm 25.08.2022 SSAMJ240(S)B", "barcode": ""}, {"code": "PK1006", "description": "1251 SBJ2 Tub Back Label  80x150mm 27.01.23 SS1251SBJ2(S)D", "barcode": ""}, {"code": "PK1007", "description": "BHS2 Tub Back Label  80x150mm 27.01.23 SSBHS2(S)C", "barcode": ""}, {"code": "PK1008", "description": "BRS2 Tub Back Label 80x 150mm 27.01.23 SSBRS2(S)C", "barcode": ""}, {"code": "PK1009", "description": "BS2 Tub Back Label 80x150mm 27.01.23 SSBS2(S)C", "barcode": ""}, {"code": "PK1010", "description": "CMA2 Tub Back Label 80x150mm 27.01.23 SSCMA2(S)D", "barcode": ""}, {"code": "PK1011", "description": "GMA2 Tub Back Label 80x 150mm 27.01.23 SSGMA2(S)C", "barcode": ""}, {"code": "PK1012", "description": "HCB2 Tub Back Label 27.01.23 SSHCB2(S)C", "barcode": ""}, {"code": "PK1013", "description": "HHS2 Tub Back Label 80X 150mm 27.01.23 SSHHS2(S)D", "barcode": ""}, {"code": "PK1014", "description": "HSD2 Tub Back Label 27.01.23 SSHSD2(S)C", "barcode": ""}, {"code": "PK1015", "description": "OBS2 Tub Back Label 27.01.23 SSOBS2(S)C", "barcode": ""}, {"code": "PK1016", "description": "OBS20 Bucket Back Label 27.01.23 SSOBS20(S)C", "barcode": ""}, {"code": "PK1017", "description": "OHS2 Tub Back Label 80x 150mm 27.01.23 SSOHS2(S)C", "barcode": ""}, {"code": "PK1018", "description": "OMA2 Tub Back Label 80x 150mm 27.01.23 SSOMA2(S)C", "barcode": ""}, {"code": "PK1019", "description": "RCI2 Tub Back Label 27.01.23 SSRCI(S)C", "barcode": ""}, {"code": "PK1020", "description": "SCB2 Tub Back Label 80x 150mm 27.01.23 SSSCB2(S)C", "barcode": ""}, {"code": "PK1021", "description": "TKE2 Tub Back Label 80x 150mm 27.01.23 SSTKE2(S)C", "barcode": ""}, {"code": "PK1022", "description": "TKE20 Bucket Back Label 27.01.23 SSTKE20(S)C", "barcode": ""}, {"code": "PK1023", "description": "Special Makhani Cook-In Sauce 61x219mm 25.01.2023 SS-MCI300(S)B", "barcode": ""}, {"code": "PK1024", "description": "Mother Tomato Cook-In Sauce 61x219mm 25.01.2023 SS-TCI300(S)B", "barcode": ""}, {"code": "PK1025", "description": "Ranchero Cook-In Sauce 61x219mm 25.01.2023 SS-RCI300(S)B", "barcode": ""}, {"code": "PK1026", "description": "Spicy Marinara Cook-In Sauce 61x219mm 25.01.2023 SS-SCI300(S)B", "barcode": ""}, {"code": "PK1027", "description": "Golden Coconut Cook-In Sauce 61x219mm 25.01.2023 SS-GCI300(S)B", "barcode": ""}, {"code": "PK1028", "description": "Smoky Southwest Cook-In Sauce 61x219mm 25.01.2023 SS-WCI300(S)B", "barcode": ""}, {"code": "PK1029", "description": "RMA Tub Back Label 80x 150mm 19.01.23 SSRMA2B", "barcode": ""}, {"code": "PK1030", "description": "Buffalo Hot Sauce Atomic 80x150mm SSABHA", "barcode": ""}, {"code": "PK1031", "description": "Buffalo Hot Sauce Truffalo 80x150mm SSTBHA", "barcode": ""}, {"code": "PK1032", "description": "Buffalo Hot Sauce Smoky Maple 80x150mm SSSBHA", "barcode": ""}, {"code": "PK1033", "description": "Buffalo Hot Sauce Gochujang 80x150mm SSGBHA", "barcode": ""}, {"code": "PK1034", "description": "EU Chipotle and Lime Aioli", "barcode": ""}, {"code": "PK1035", "description": "EU Original BBQ", "barcode": ""}, {"code": "PK1036", "description": "EU Original Hot Sauce", "barcode": ""}, {"code": "PK1037", "description": "EU Honey Chipotle BBQ Sauce Label", "barcode": ""}, {"code": "PK1038", "description": "(FRONT) Spicy Breakfast Sauce 50mmX70mm 15.03.24 SSSBS300(S)B", "barcode": ""}, {"code": "PK1039", "description": "(BACK) Spicy Breakfast Sauce 50mmX70mm 15.03.24 SSSBS300(S)B", "barcode": ""}, {"code": "PK1040", "description": "(FRONT) Honey Chipotle BBQ Sauce 50mmX70mm  SSHCB300A 320g Label", "barcode": ""}, {"code": "PK1041", "description": "(BACK) Honey Chipotle BBQ Sauce 50mmX70mm SSHCB300A 320g Label", "barcode": ""}, {"code": "PK1042", "description": "(FRONT) Original BBQ Sauce 50mmx70mm SSOBS300B 350g Label", "barcode": ""}, {"code": "PK1043", "description": "(BACK) Original BBQ Sauce 50mmx70mm SSOBS300B 350g Label", "barcode": ""}, {"code": "PK1044", "description": "Ranch Mayo 270g Label FRONT", "barcode": ""}, {"code": "PK1045", "description": "Ranch Mayo 270g Label BACK", "barcode": ""}, {"code": "PK1046", "description": "Chipotle & Lime Aioli 270g Label FRONT", "barcode": ""}, {"code": "PK1047", "description": "Chipotle & Lime Aioli 270g Label BACK", "barcode": ""}, {"code": "PK1048", "description": "(FRONT) Brown Sauce 50mmx70mm 11.07.24 SSBRS300B", "barcode": ""}, {"code": "PK1049", "description": "(BACK) Brown Sauce 50mmx70mm 11.03.24 SSBRS300A", "barcode": ""}, {"code": "PK1050", "description": "Burger Sauce 270g Label FRONT", "barcode": ""}, {"code": "PK1051", "description": "Burger Sauce 270g Label BACK", "barcode": ""}, {"code": "PK1052", "description": "(FRONT) Original Mayo 50mmx70mm 13.06.24 SSOMA300A", "barcode": ""}, {"code": "PK1053", "description": "(BACK) Original Mayo 50mmx70mm 13.06.24 SSOMA300A", "barcode": ""}, {"code": "PK1054", "description": "Pizza and Pasta Seasoning 190g w195mm x h60mm SSPTRA", "barcode": ""}, {"code": "PK1055", "description": "House Seasoning 190g w195mm x h60mm SSHSRA", "barcode": ""}, {"code": "PK1056", "description": "Brown Sauce Tub Label", "barcode": ""}, {"code": "PK1057", "description": "Garlic Mayo 285ml FRONT", "barcode": ""}, {"code": "PK1058", "description": "Garlic Mayo 285ml BACK", "barcode": ""}, {"code": "PK1059", "description": "Original BBQ Sauce 340g FRONT", "barcode": ""}, {"code": "PK1060", "description": "Original BBQ Sauce 340g BACK", "barcode": ""}, {"code": "PK1061", "description": "Cranberry Hot Honey Label  80 x 150mm", "barcode": ""}, {"code": "PK1062", "description": "A4 SAUCE SHOP LABELS MATT LAMINATED", "barcode": ""}, {"code": "PK1063", "description": "GWOBSA Games Workshop Original BBQ Sauce 340g Label FRONT", "barcode": ""}, {"code": "PK1064", "description": "GWOBSA Games Workshop Original BBQ Sauce 340g Label BACK", "barcode": ""}, {"code": "PK1065", "description": "Buffalo Hot Sauce 150ml label", "barcode": ""}, {"code": "PK1066", "description": "GWBHSA Games Workshop Buffalo Hot Sauce 160g Label", "barcode": ""}, {"code": "PK1067", "description": "EU Chipotle and Lime Aioli 285ml BACK", "barcode": ""}, {"code": "PK1068", "description": "Pineapple Habanero Hot Sauce 80 x 150mm", "barcode": ""}, {"code": "PK1069", "description": "Pineapple Habanero 80x150mm 10.04.25 SSPHH2PEX", "barcode": ""}, {"code": "PK1070", "description": "Pineapple Habanero 80x150mm 15.04.25 SSPHH2", "barcode": ""}, {"code": "PK1071", "description": "Peri Peri 80x150mm 00.00.00 SSPEHA", "barcode": ""}, {"code": "PK1072", "description": "(FRONT) Scotch Bonnet Jam 50x70mm TBC25. SSSBJ300A", "barcode": ""}, {"code": "PK1073", "description": "(BACK) Scotch Bonnet Jam 50x70mm TBC25. SSSBJ300A", "barcode": ""}, {"code": "PK1074", "description": "Truffle & Black Pepper Cooking Sauce 06.08.25 SSTBPA", "barcode": ""}, {"code": "PK1075", "description": "(FRONT) Truffle BBQ Sauce 06.08.25 SSTBSA", "barcode": ""}, {"code": "PK1076", "description": "(BACK) Truffle BBQ Sauce 06.08.25 SSTBSA", "barcode": ""}, {"code": "PK1077", "description": "Truffle Hot Honey SSTHHA 06.08.25", "barcode": ""}, {"code": "PK1078", "description": "(FRONT) Truffle Mayo SSTMAA 06.08.25", "barcode": ""}, {"code": "PK1079", "description": "(BACK) Truffle Mayo SSTMAA 06.08.25", "barcode": ""}, {"code": "PK1080", "description": "WHITE LABEL ROLL 28mm x 51mm.  220 per roll", "barcode": ""}, {"code": "PK1081", "description": "PEACH HABANERO 80x150mm SSPEHPEXA", "barcode": ""}, {"code": "PK1082", "description": "PEHPEX Tub Peach Habanero 22.01.26 SSPEHPEX2A", "barcode": ""}, {"code": "PK1083", "description": "(FRONT) Hot Honey Aioli 50mmx70mm 04.02.26 HMAA", "barcode": ""}, {"code": "PK1084", "description": "(BACK) Hot Honey Aioli 50mmx70mm 04.02.26 HMAA", "barcode": ""}, {"code": "PK1085", "description": "(FRONT) Maple Cajun BBQ 50mmx70mm 04.02.26 MCBA", "barcode": ""}, {"code": "PK1086", "description": "(BACK) Maple Cajun BBQ 50mmx70mm 04.02.26 MCBA", "barcode": ""}, {"code": "PK1087", "description": "(FRONT) Honey Mustard BBQ 50mmx70mm 04.02.26 HMBA", "barcode": ""}, {"code": "PK1088", "description": "(BACK) Honey Mustard BBQ 50mmx70mm 04.02.26 HMBA", "barcode": ""}, {"code": "PK1089", "description": "PIRI PIRI 80x150mm 05.02.26 SSPRH2", "barcode": ""}, {"code": "PK1090", "description": "Habanero Hot Sauce 80x150mm - V: 11.11.2021", "barcode": ""}, {"code": "PK1091", "description": "Original Hot Sauce 150ml label", "barcode": ""}, {"code": "PK1092", "description": "(FRONT) Tomato Ketchup 95x60mm - V: 03.12.21", "barcode": ""}, {"code": "PK1093", "description": "(BACK) Tomato Ketchup 95x60mm - V: 03.12.21", "barcode": ""}, {"code": "PK1094", "description": "Honey Sriracha 150ml Label", "barcode": ""}, {"code": "PK1095", "description": "MAXI 30ml DISPENSING PUMP FOR 2Kg TUB", "barcode": ""}, {"code": "PK1096", "description": "300ml Orion", "barcode": ""}, {"code": "PK1097", "description": "330ml Recessed Cylindrical PET", "barcode": ""}, {"code": "PK1098", "description": "BLACK HEATSEALED 63 SP400 DUO FLAPPER", "barcode": ""}, {"code": "PK1099", "description": "BHSx2 Sachet Film OPP Gloss 25 Mic / 30 Mic EVOH Clear PE 320mm wide x 128mm rpt", "barcode": ""}, {"code": "PK1100", "description": "HCBx2 Sachet Film OPP Gloss 25 Mic / 30 Mic EVOH Clear PE 320mm wide x 128mm rpt", "barcode": ""}, {"code": "PK1101", "description": "Shrink Sleeve 150ml Bottle (46 x 0.07 x 53mm)", "barcode": ""}, {"code": "PK1102", "description": "150ml Worcester Bottle", "barcode": ""}, {"code": "PK1103", "description": "Black Cap for 150ml", "barcode": ""}, {"code": "PK1104", "description": "452ml Bottle", "barcode": ""}, {"code": "PK1105", "description": "452ml Lid", "barcode": ""}, {"code": "PK1106", "description": "3.75L Bear Cap", "barcode": ""}, {"code": "PK1107", "description": "2.35 MINI BEAR TUB", "barcode": ""}, {"code": "PK1108", "description": "BUCKET 21L JET2  WHITE (MOQ 114 - CARRIAGE PAID IN perEA)", "barcode": ""}, {"code": "PK1109", "description": "LID 16L JET2 16 - 21L WHITE (MOQ 114 - CARRIAGE PAID IN perEA)", "barcode": ""}, {"code": "PK1110", "description": "BUCKET 10.7L PJET - WHITE (300 MOQ)", "barcode": ""}, {"code": "PK1111", "description": "LID 7L PJET 7 - 10.7L - WHITE (MOQ 300)", "barcode": ""}, {"code": "PK1112", "description": "240g Jam Jar", "barcode": ""}, {"code": "PK1113", "description": "240g Jam Jar Button Cap", "barcode": ""}, {"code": "PK1114", "description": "lb Jam Jar", "barcode": ""}, {"code": "PK1115", "description": "Rotech Ink Cartridge - SDBLK4  35ml", "barcode": ""}, {"code": "PK1116", "description": "Rotech Ink Cartridge - SD White 35ml", "barcode": ""}, {"code": "PK2000", "description": "COOKING SAUCE SRP", "barcode": ""}, {"code": "PK2001", "description": "Tub 2 Pack", "barcode": ""}, {"code": "PK2002", "description": "Chilli Challange 5 Pack Gift Box", "barcode": ""}, {"code": "PK2003", "description": "BBQ 5 Pack Gift Box", "barcode": ""}, {"code": "PK2004", "description": "Tub 4 Pack", "barcode": ""}, {"code": "PK2005", "description": "Jam SRP", "barcode": ""}, {"code": "PK2006", "description": "Sauce Tray", "barcode": ""}, {"code": "PK2007", "description": "Hot Sauce Tray", "barcode": ""}, {"code": "PK2008", "description": "JAR TRAY", "barcode": ""}, {"code": "PK2009", "description": "SQUEEZY TRAY", "barcode": ""}, {"code": "PK2010", "description": "BUFFALO HOT SAUCE GIFT PACK", "barcode": ""}, {"code": "PK2011", "description": "300ml SQUEEZY TRAY", "barcode": ""}, {"code": "PK2012", "description": "Gift Box Sleeve 4 Colour Litho + varnish FBB GC2-400mu 250gsm", "barcode": ""}, {"code": "PK2013", "description": "Gift Box Box White 1 Col 120WTK/125hiB/125K", "barcode": ""}, {"code": "PK2014", "description": "Hamper Gift Box", "barcode": ""}, {"code": "PK2015", "description": "Truffle Gift Box Sleeve 4 Colour Litho + varnish FBB GC2-400mu 250gsm", "barcode": ""}, {"code": "PK2016", "description": "Gift Box (3 Pack)", "barcode": ""}, {"code": "PK2017", "description": "500g Outer Case 171x153x166 (Fridge Pack)", "barcode": ""}, {"code": "PK2018", "description": "Collation Shrink Film", "barcode": ""}, {"code": "PK2019", "description": "Plain White Perforated Desktop Direct Thermal Label 101mm x 51.5mm (Box of 12)", "barcode": ""}, {"code": "PK3000", "description": "A4 PRINTED DOCUMENTS ENCLOSED WALLET (500/BOX)", "barcode": ""}, {"code": "PK3001", "description": "Pallet Wrap Extended Core", "barcode": ""}, {"code": "PK3002", "description": "Standard Duty White Paper Tape", "barcode": ""}, {"code": "PK3003", "description": "Solid cardboard edge protectors 1000 x 35 x 35 mm", "barcode": ""}, {"code": "PK3004", "description": "Solid cardboard edge protectors 1000 x 35 x 35 mm", "barcode": ""}, {"code": "PK4000", "description": "E-Commerce 12 Pack", "barcode": ""}, {"code": "PK4001", "description": "E-Commerce 12 Pack Dividers", "barcode": ""}, {"code": "PK4002", "description": "E-Commerce 12 Pack Base and Top Pads", "barcode": ""}, {"code": "PK4003", "description": "Gift Pack (2 Pack)", "barcode": ""}, {"code": "PK4004", "description": "MINI TUB 6 PACK 1000 PRICE BREAK", "barcode": ""}, {"code": "PK4005", "description": "MINI TUB 2 PACK 1200 PRICE BREAK", "barcode": ""}, {"code": "PK4006", "description": "XMAS 2 Pack Gift Box", "barcode": ""}, {"code": "PK4007", "description": "MEDIUM SHIPPING 408x213x103 120WTT/110hiB/110T", "barcode": ""}, {"code": "PK4008", "description": "LARGE GIFT BOX 450 x 380 x 220 150K/150T BC D/W", "barcode": ""}, {"code": "PK4009", "description": "LARGE GIFT BOX OUTER 455 x 360 x 163 150K/150T BC D/W", "barcode": ""}, {"code": "PK4010", "description": "12 SHIPPING 408x213x206 125WK/125T BC D/W", "barcode": ""}, {"code": "PK4011", "description": "Hamper Gift Box Outer", "barcode": ""}, {"code": "PK4012", "description": "420x327x207 8 Case Shipping Box", "barcode": ""}, {"code": "PK4013", "description": "12\"x9\"x4\" Single Wall Box", "barcode": ""}, {"code": "RM0000", "description": "Tap", "barcode": ""}, {"code": "RM0001", "description": "Unsalted Butter", "barcode": ""}, {"code": "RM0002", "description": "FR Egg Yolk Powder", "barcode": ""}, {"code": "RM0003", "description": "Single Cream", "barcode": ""}, {"code": "RM0004", "description": "BUTTERMILK POWDER", "barcode": ""}, {"code": "RM0005", "description": "Soured Cream Powder", "barcode": ""}, {"code": "RM1000", "description": "Chipotle Powder", "barcode": ""}, {"code": "RM1001", "description": "Dehydrated Tomato Granules 1 - 3mm CP219TG", "barcode": ""}, {"code": "RM1002", "description": "Heat Treated Minced Onion CP913OM", "barcode": ""}, {"code": "RM1003", "description": "Basil Rubbed Steam Treated CP07B", "barcode": ""}, {"code": "RM1004", "description": "Smoked Paprika", "barcode": ""}, {"code": "RM1005", "description": "Heat Treated Marjoram CP76MJ", "barcode": ""}, {"code": "RM1006", "description": "Minced Garlic 11004", "barcode": ""}, {"code": "RM1007", "description": "Heat Treated Rubbed Oregano 11582", "barcode": ""}, {"code": "RM1008", "description": "GROUND CUMIN", "barcode": ""}, {"code": "RM1009", "description": "Ground Bay Leaf", "barcode": ""}, {"code": "RM1010", "description": "Ground Coriander Seed", "barcode": ""}, {"code": "RM1011", "description": "Ground Cinnamon", "barcode": ""}, {"code": "RM1012", "description": "Ground Fennel Seed", "barcode": ""}, {"code": "RM1013", "description": "Ground Cayenne", "barcode": ""}, {"code": "RM1014", "description": "Ground Turmeric", "barcode": ""}, {"code": "RM1015", "description": "Ground Paprika", "barcode": ""}, {"code": "RM1016", "description": "Ground Ginger", "barcode": ""}, {"code": "RM1017", "description": "Cracked Black Pepper", "barcode": ""}, {"code": "RM1018", "description": "Garlic Powder", "barcode": ""}, {"code": "RM1019", "description": "Onion Powder", "barcode": ""}, {"code": "RM1020", "description": "Ground Clove", "barcode": ""}, {"code": "RM1021", "description": "Ground Oregano", "barcode": ""}, {"code": "RM1022", "description": "Ground Garam Masala", "barcode": ""}, {"code": "RM1023", "description": "Cardamon", "barcode": ""}, {"code": "RM1024", "description": "Ground Kashmiri Chilli", "barcode": ""}, {"code": "RM1025", "description": "Ground Fenugreek Leaves", "barcode": ""}, {"code": "RM1026", "description": "Ground Allspice", "barcode": ""}, {"code": "RM1027", "description": "Ground Nutmeg", "barcode": ""}, {"code": "RM1028", "description": "NON HEAT TREATED FINE GROUND YELLOW (WHITE) MUSTARD FLOUR", "barcode": ""}, {"code": "RM1029", "description": "DRIED HT CHIVE ROUNDS", "barcode": ""}, {"code": "RM1030", "description": "DRIED HT DILL TOPS", "barcode": ""}, {"code": "RM1031", "description": "DRIED HT PARSLEY", "barcode": ""}, {"code": "RM1032", "description": "Ground Mustard (Heat Treated)", "barcode": ""}, {"code": "RM2000", "description": "AMERICAN MUSTARD (20KG Bucket 480KG per Pallet)", "barcode": ""}, {"code": "RM2001", "description": "Tamarind Concentrate (24 KG Container)", "barcode": ""}, {"code": "RM2002", "description": "Tamari (25 KG Container)", "barcode": ""}, {"code": "RM3000", "description": "Table Salt", "barcode": ""}, {"code": "RM3001", "description": "Smoked Water", "barcode": ""}, {"code": "RM3002", "description": "Smoked Water", "barcode": ""}, {"code": "RM3003", "description": "Liquid Antioxidant", "barcode": ""}, {"code": "RM3004", "description": "Herbacel AQ Plus Citrus - F", "barcode": ""}, {"code": "RM4000", "description": "BLACK TRUFFLE OIL DOUBLE CONCENTRATE", "barcode": ""}, {"code": "RM4001", "description": "Refined Avocado Oil", "barcode": ""}, {"code": "RM4002", "description": "Extra Light Olive Oil", "barcode": ""}, {"code": "RM4003", "description": "Rapeseed Oil", "barcode": ""}, {"code": "RM4004", "description": "Coconut Oil", "barcode": ""}, {"code": "RM5000", "description": "White Wine Vinegar 12%", "barcode": ""}, {"code": "RM5001", "description": "Vodka", "barcode": ""}, {"code": "RM6000", "description": "Molasses (25kg Bucket)", "barcode": ""}, {"code": "RM6001", "description": "Maple Syrup", "barcode": ""}, {"code": "RM6002", "description": "Honey", "barcode": ""}, {"code": "RM6003", "description": "White Sugar", "barcode": ""}, {"code": "RM7000", "description": "IQF Lime Juice Tablets", "barcode": ""}, {"code": "RM7001", "description": "Pitted Dates", "barcode": ""}, {"code": "RM7002", "description": "Lemon Juice 10Kg BLOCK FROZEN", "barcode": ""}, {"code": "RM7003", "description": "Onion", "barcode": ""}, {"code": "RM7004", "description": "Tomato Paste (20 KG Box)", "barcode": ""}, {"code": "RM7005", "description": "DICED TOMATOES (20 KG Box)", "barcode": ""}, {"code": "RM7006", "description": "IQF Red Habanero Diced", "barcode": ""}, {"code": "RM7007", "description": "Ginger Puree Tablet", "barcode": ""}, {"code": "RM7008", "description": "IQF Red Jalapeno Diced", "barcode": ""}, {"code": "RM7009", "description": "Garlic Puree Tablets", "barcode": ""}, {"code": "RM7010", "description": "IQF Basil", "barcode": ""}, {"code": "RM7011", "description": "IQF Oregano", "barcode": ""}, {"code": "RM7012", "description": "Scotch Bonnet Grilled Cost Through", "barcode": ""}, {"code": "RM7013", "description": "Coconut Cream", "barcode": ""}, {"code": "RM7014", "description": "Yellow Pepper", "barcode": ""}, {"code": "RM7015", "description": "IQF Pineapple", "barcode": ""}, {"code": "RM7016", "description": "Minced Black Truffles in Olive Oil", "barcode": ""}, {"code": "RM7017", "description": "IQF Scotch Bonnet", "barcode": ""}, {"code": "RM7018", "description": "IQF Peach", "barcode": ""}, {"code": "RM7019", "description": "IQF Aji Amarillo Whole", "barcode": ""}, {"code": "RM9999", "description": "Tap", "barcode": ""}, {"code": "SS-1251-SBJ2", "description": "Sauce Shop X 12:51 - Scotch Bonnet Chilli Jam 2.9 KG", "barcode": "15060604011415"}, {"code": "SS-1251-SBJ2(S)", "description": "Sauce Shop X 12:51 - Scotch Bonnet Chilli Jam 2.9 KG", "barcode": "5060604011418"}, {"code": "SS-AMJ240", "description": "Amarillo Jam 0.24 KG", "barcode": "15060604011408"}, {"code": "SS-AMJ240(S)", "description": "Amarillo Jam 0.24 KG", "barcode": "5060604011401"}, {"code": "SS-BHC10(S)", "description": "Buffalo Hot Concentrate 10 KG", "barcode": "5060604013535"}, {"code": "SS-BHS", "description": "Buffalo Hot Sauce 0.16 KG", "barcode": "7023829991000"}, {"code": "SS-BHS(S)", "description": "Buffalo Hot Sauce 0.16 KG", "barcode": "702382999100"}, {"code": "SS-BHS2", "description": "Buffalo Hot Sauce 2.3 KG", "barcode": "15060604011422"}, {"code": "SS-BHS2(S)", "description": "Buffalo Hot Sauce 2.3 KG", "barcode": "5060604011425"}, {"code": "SS-BRS2", "description": "Brown Sauce 2.5 KG", "barcode": "15060604011439"}, {"code": "SS-BRS2(S)", "description": "Brown Sauce 2.5 KG", "barcode": "5060604011432"}, {"code": "SS-BRS300", "description": "Brown Sauce 0.32 KG", "barcode": "15060604012337"}, {"code": "SS-BRS300(S)", "description": "Brown Sauce 0.32 KG", "barcode": "5060604012330"}, {"code": "SS-BS2", "description": "Burger Sauce 2.1 KG", "barcode": "15060604011446"}, {"code": "SS-BS2(S)", "description": "Burger Sauce 2.1 KG", "barcode": "5060604011449"}, {"code": "SS-BS300", "description": "Burger Sauce 0.27 KG", "barcode": "15060604012382"}, {"code": "SS-BS300(S)", "description": "Burger Sauce 0.27 KG", "barcode": "5060604012385"}, {"code": "SS-CHH", "description": "Spiced Cranberry Hot Honey 0.16 KG", "barcode": ""}, {"code": "SS-CHH(S)", "description": "Spiced Cranberry Hot Honey 0.16 KG", "barcode": "5060604012781"}, {"code": "SS-CMA2", "description": "Chipotle & Lime Aioli 2.1 KG", "barcode": "15060604011460"}, {"code": "SS-CMA2(S)", "description": "Chipotle & Lime Aioli 2.1 KG", "barcode": "5060604011463"}, {"code": "SS-CMA300", "description": "Chipotle & Lime Aioli 0.27 KG", "barcode": "15060604012320"}, {"code": "SS-CMA300(S)", "description": "Chipotle & Lime Aioli 0.27 KG", "barcode": "5060604012323"}, {"code": "SS-GCI300", "description": "Golden Coconut Curry Simmer Sauce 0.36 KG", "barcode": "15060604011835"}, {"code": "SS-GCI300(S)", "description": "Golden Coconut Curry Simmer Sauce 0.36 KG", "barcode": "5060604011838"}, {"code": "SS-GMA2", "description": "Garlic Mayo 2.1 KG", "barcode": "15060604011484"}, {"code": "SS-GMA2(S)", "description": "Garlic Mayo 2.1 KG", "barcode": "5060604011487"}, {"code": "SS-GMA300", "description": "Garlic Mayo 0.27 KG", "barcode": "15060604012399"}, {"code": "SS-GMA300(S)", "description": "Garlic Mayo 0.27 KG", "barcode": "5060604012392"}, {"code": "SS-HCB", "description": "Honey Chipotle BBQ Sauce 0.26 KG", "barcode": "15060604011057"}, {"code": "SS-HCB(S)", "description": "Honey Chipotle BBQ Sauce 0.26 KG", "barcode": "5060604011050"}, {"code": "SS-HCB2", "description": "Honey Chipotle BBQ Sauce 2.5 KG", "barcode": "15060604011491"}, {"code": "SS-HCB2(S)", "description": "Honey Chipotle BBQ Sauce 2.5 KG", "barcode": "5060604011494"}, {"code": "SS-HCB300", "description": "Honey Chipotle BBQ Sauce 0.32 KG", "barcode": "15060604012405"}, {"code": "SS-HCB300(S)", "description": "Honey Chipotle BBQ Sauce 0.34 KG", "barcode": "5060604012408"}, {"code": "SS-HSD", "description": "Honey Sriracha Drizzle 0.19 KG", "barcode": "15060604010425"}, {"code": "SS-HSD(S)", "description": "Honey Sriracha Drizzle 0.19 KG", "barcode": "5060604010428"}, {"code": "SS-HSD10(S)", "description": "Honey Sriracha Drizzle 12.5 KG", "barcode": ""}, {"code": "SS-HSD2", "description": "Honey Sriracha Drizzle 2.5 KG", "barcode": "15060604011521"}, {"code": "SS-HSD2(S)", "description": "Honey Sriracha Drizzle 2.5 KG", "barcode": "5060604011524"}, {"code": "SS-HSR330", "description": "House Seasoning 0.19 KG", "barcode": "15060604012474"}, {"code": "SS-HSR330(S)", "description": "House Seasoning 0.19 KG", "barcode": "5060604012477"}, {"code": "SS-JFR330", "description": "Green Jalapeno Flakes 0.05 KG", "barcode": "15060604011484"}, {"code": "SS-JFR330(S)", "description": "Green Jalapeno Flakes 0.05 KG", "barcode": "5060604012507"}, {"code": "SS-MCI300", "description": "Special Makhani Simmer Sauce 0.36 KG", "barcode": "15060604011873"}, {"code": "SS-MCI300(S)", "description": "Special Makhani Simmer Sauce 0.36 KG", "barcode": "5060604011876"}, {"code": "SS-MTB300", "description": "Miso Teriyaki BBQ Sauce 0.32 KG", "barcode": "15060604012306"}, {"code": "SS-MTB300(S)", "description": "Miso Teriyaki BBQ Sauce 0.32 KG", "barcode": "5060604012309"}, {"code": "SS-OBR330", "description": "Original BBQ Rub 0.19 KG", "barcode": "15060604012443"}, {"code": "SS-OBR330(S)", "description": "Original BBQ Rub 0.19 KG", "barcode": "5060604012446"}, {"code": "SS-OBS2", "description": "Original BBQ Sauce 2.5 KG", "barcode": "15060604011538"}, {"code": "SS-OBS2(S)", "description": "Original BBQ Sauce 2.5 KG", "barcode": "5060604011531"}, {"code": "SS-OBS300", "description": "Original BBQ Sauce 0.32 KG", "barcode": "15060604012771"}, {"code": "SS-OBS300(S)", "description": "Original BBQ Sauce 0.32 KG", "barcode": "5060604012774"}, {"code": "SS-OHS", "description": "Original Hot Sauce 0.16 KG", "barcode": "7023829992236"}, {"code": "SS-OHS(S)", "description": "Original Hot Sauce 0.16 KG", "barcode": "702382999223"}, {"code": "SS-OHS2", "description": "Original Hot Sauce 2.3 KG", "barcode": "15060604011545"}, {"code": "SS-OHS2(S)", "description": "Original Hot Sauce 2.3 KG", "barcode": "5060604011548"}, {"code": "SS-OMA2", "description": "Original Mayo 2.1 KG", "barcode": "15060604011552"}, {"code": "SS-OMA2(S)", "description": "Original Mayo 2.1 KG", "barcode": "5060604011555"}, {"code": "SS-OMA300", "description": "Original Mayo 0.27 KG", "barcode": "15060604012344"}, {"code": "SS-OMA300(S)", "description": "Original Mayo 0.27 KG", "barcode": "5060604012347"}, {"code": "SS-PHH", "description": "Pineapple Habanero Hot Sauce 0.16 KG", "barcode": "15060604013440"}, {"code": "SS-PHH(S)", "description": "Pineapple Habanero Hot Sauce 0.16 KG", "barcode": "5060604013443"}, {"code": "SS-PHH2", "description": "Pineapple Habanero Hot Sauce 2.3 KG", "barcode": "15060604013501"}, {"code": "SS-PHH2(S)", "description": "Pineapple Habanero Hot Sauce 2.3 KG", "barcode": "5060604013504"}, {"code": "SS-PRH", "description": "Piri Piri Hot Sauce 0.16 KG", "barcode": "15060604013518"}, {"code": "SS-PRH(S)", "description": "Piri Piri Hot Sauce 0.16 KG", "barcode": "5060604013511"}, {"code": "SS-PTR330", "description": "Pizza and Pasta Seasoning 0.13 KG", "barcode": "15060604012481"}, {"code": "SS-PTR330(S)", "description": "Pizza and Pasta Seasoning 0.13 KG", "barcode": "5060604012484"}, {"code": "SS-RCI300", "description": "Ranchero Simmer Sauce 0.37 KG", "barcode": "15060604011859"}, {"code": "SS-RCI300(S)", "description": "Ranchero Simmer Sauce 0.37 KG", "barcode": "5060604011852"}, {"code": "SS-RMA2", "description": "Ranch Mayo 2.1 KG", "barcode": "15060604012054"}, {"code": "SS-RMA2(S)", "description": "Ranch Mayo 2.1 KG", "barcode": "5060604012057"}, {"code": "SS-RMA300", "description": "Ranch Mayo 0.27 KG", "barcode": "15060604012351"}, {"code": "SS-RMA300(S)", "description": "Ranch Mayo 0.27 KG", "barcode": "5060604012354"}, {"code": "SS-SBJ240", "description": "Sauce Shop X 12:51 - Scotch Bonnet Chilli Jam 0.24 KG", "barcode": "15060604011385"}, {"code": "SS-SBJ240(S)", "description": "Sauce Shop X 12:51 - Scotch Bonnet Chilli Jam 0.24 KG", "barcode": "5060604011388"}, {"code": "SS-SBR330", "description": "Smoky Chipotle BBQ Rub 0.19 KG", "barcode": "15060604012450"}, {"code": "SS-SBR330(S)", "description": "Smoky Chipotle BBQ Rub 0.19 KG", "barcode": "5060604012453"}, {"code": "SS-SBS300", "description": "Spicy Breakfast Sauce 0.32 KG", "barcode": "15060604012207"}, {"code": "SS-SBS300(S)", "description": "Spicy Breakfast Sauce 0.32 KG", "barcode": "5060604012200"}, {"code": "SS-SCB2", "description": "Carolina Mustard BBQ Sauce 0.5 KG", "barcode": "15060604011392"}, {"code": "SS-SCB2(S)", "description": "Carolina Mustard BBQ Sauce 2.5 KG", "barcode": "5060604011395"}, {"code": "SS-SCI300", "description": "Spicy Marinara Simmer Sauce 0.36 KG", "barcode": "15060604011842"}, {"code": "SS-SCI300(S)", "description": "Spicy Marinara Simmer Sauce 0.36 KG", "barcode": "5060604011845"}, {"code": "SS-SRI2", "description": "Sriracha Chilli Sauce 2.5 KG", "barcode": "15060604011590"}, {"code": "SS-SRI2(S)", "description": "Sriracha Chilli Sauce 2.5 KG", "barcode": "5060604011593"}, {"code": "SS-SRI300", "description": "Sriracha Chilli Sauce 0.32 KG", "barcode": "15060604012313"}, {"code": "SS-SRI300(S)", "description": "Sriracha Chilli Sauce 0.32 KG", "barcode": "5060604012316"}, {"code": "SS-TBH", "description": "Truffalo Buffalo Sauce 0.16 KG", "barcode": "15060604012139"}, {"code": "SS-TBH(S)", "description": "Truffalo Buffalo Sauce 0.16 KG", "barcode": "5060604012132"}, {"code": "SS-TBP300(S)", "description": "Truffle Black Pepper Simmer Sauce 0.36 KG", "barcode": "5060604013610"}, {"code": "SS-TBQ300(S)", "description": "Truffle BBQ Sauce 0.34 KG", "barcode": "5060604013627"}, {"code": "SS-TCI300", "description": "Mother Tomato Simmer Sauce 0.36 KG", "barcode": "15060604011866"}, {"code": "SS-TCI300(S)", "description": "Mother Tomato Simmer Sauce 0.36 KG", "barcode": "5060604011869"}, {"code": "SS-THH(S)", "description": "Truffle Hot Honey 0.18 KG", "barcode": "5060604013603"}, {"code": "SS-TKE2", "description": "Tomato Ketchup 2.5 KG", "barcode": "15060604011606"}, {"code": "SS-TKE2(S)", "description": "Tomato Ketchup 2.5 KG", "barcode": "5060604011609"}, {"code": "SS-TKE500", "description": "Tomato Ketchup 0.49 KG", "barcode": "15060604010043"}, {"code": "SS-TKE500(S)", "description": "Tomato Ketchup 0.49 KG", "barcode": "5060604010046"}, {"code": "SS-TMA300(S)", "description": "Truffle Mayo 0.275 KG", "barcode": "5060604013597"}, {"code": "SS-WCI300", "description": "Smoky Southwest Simmer Sauce 0.36 KG", "barcode": "15060604011828"}, {"code": "SS-WCI300(S)", "description": "Smoky Southwest Simmer Sauce 0.36 KG", "barcode": "5060604011821"}];
-const LOCATIONS = ["UNIT2-Z1-A1-B01-S1-L1", "UNIT2-Z1-A1-B01-S2-L1", "UNIT2-Z1-A1-B01-S3-L1", "UNIT2-Z1-A1-B01-S4-L1", "UNIT2-Z1-A1-B02-S1-L1", "UNIT2-Z1-A1-B02-S2-L1", "UNIT2-Z1-A1-B02-S3-L1", "UNIT2-Z1-A1-B02-S4-L1", "UNIT2-Z1-A1-B03-S1-L1", "UNIT2-Z1-A1-B03-S2-L1", "UNIT2-Z1-A1-B03-S3-L1", "UNIT2-Z1-A1-B03-S4-L1", "UNIT2-Z1-A1-B04-S1-L1", "UNIT2-Z1-A1-B04-S2-L1", "UNIT2-Z1-A1-B04-S3-L1", "UNIT2-Z1-A1-B04-S4-L1", "UNIT2-Z1-A1-B05-S1-L1", "UNIT2-Z1-A1-B05-S2-L1", "UNIT2-Z1-A1-B05-S3-L1", "UNIT2-Z1-A1-B05-S4-L1", "UNIT2-Z1-A1-B06-S1-L1", "UNIT2-Z1-A1-B06-S2-L1", "UNIT2-Z1-A1-B06-S3-L1", "UNIT2-Z1-A1-B06-S4-L1", "UNIT2-Z1-A1-B07-S1-L1", "UNIT2-Z1-A1-B07-S2-L1", "UNIT2-Z1-A1-B07-S3-L1", "UNIT2-Z1-A1-B07-S4-L1", "UNIT2-Z1-A1-B08-S1-L1", "UNIT2-Z1-A1-B08-S2-L1", "UNIT2-Z1-A1-B08-S3-L1", "UNIT2-Z1-A1-B08-S4-L1", "UNIT2-Z1-A1-B09-S1-L1", "UNIT2-Z1-A1-B09-S2-L1", "UNIT2-Z1-A1-B09-S3-L1", "UNIT2-Z1-A1-B09-S4-L1", "UNIT2-Z1-A1-B10-S1-L1", "UNIT2-Z1-A1-B10-S2-L1", "UNIT2-Z1-A1-B10-S3-L1", "UNIT2-Z1-A1-B10-S4-L1", "UNIT2-Z1-A2-B01-S1-L1", "UNIT2-Z1-A2-B01-S2-L1", "UNIT2-Z1-A2-B01-S3-L1", "UNIT2-Z1-A2-B01-S4-L1", "UNIT2-Z1-A2-B02-S1-L1", "UNIT2-Z1-A2-B02-S2-L1", "UNIT2-Z1-A2-B02-S3-L1", "UNIT2-Z1-A2-B02-S4-L1", "UNIT2-Z1-A2-B03-S1-L1", "UNIT2-Z1-A2-B03-S2-L1", "UNIT2-Z1-A2-B03-S3-L1", "UNIT2-Z1-A2-B03-S4-L1", "UNIT2-Z1-A2-B04-S1-L1", "UNIT2-Z1-A2-B04-S2-L1", "UNIT2-Z1-A2-B04-S3-L1", "UNIT2-Z1-A2-B04-S4-L1", "UNIT2-Z1-A2-B05-S1-L1", "UNIT2-Z1-A2-B05-S2-L1", "UNIT2-Z1-A2-B05-S3-L1", "UNIT2-Z1-A2-B05-S4-L1", "UNIT2-Z1-A2-B06-S1-L1", "UNIT2-Z1-A2-B06-S2-L1", "UNIT2-Z1-A2-B06-S3-L1", "UNIT2-Z1-A2-B06-S4-L1", "UNIT2-Z1-A2-B07-S1-L1", "UNIT2-Z1-A2-B07-S2-L1", "UNIT2-Z1-A2-B07-S3-L1", "UNIT2-Z1-A2-B07-S4-L1", "UNIT2-Z1-A2-B08-S1-L1", "UNIT2-Z1-A2-B08-S2-L1", "UNIT2-Z1-A2-B08-S3-L1", "UNIT2-Z1-A2-B08-S4-L1", "UNIT2-Z1-A2-B09-S1-L1", "UNIT2-Z1-A2-B09-S2-L1", "UNIT2-Z1-A2-B09-S3-L1", "UNIT2-Z1-A2-B09-S4-L1", "UNIT2-Z1-A2-B10-S1-L1", "UNIT2-Z1-A2-B10-S2-L1", "UNIT2-Z1-A2-B10-S3-L1", "UNIT2-Z1-A2-B10-S4-L1", "UNIT2-Z1-A3-B01-S1-L1", "UNIT2-Z1-A3-B01-S2-L1", "UNIT2-Z1-A3-B01-S3-L1", "UNIT2-Z1-A3-B01-S4-L1", "UNIT2-Z1-A3-B02-S1-L1", "UNIT2-Z1-A3-B02-S2-L1", "UNIT2-Z1-A3-B02-S3-L1", "UNIT2-Z1-A3-B02-S4-L1", "UNIT2-Z1-A3-B03-S1-L1", "UNIT2-Z1-A3-B03-S2-L1", "UNIT2-Z1-A3-B03-S3-L1", "UNIT2-Z1-A3-B03-S4-L1", "UNIT2-Z1-A3-B04-S1-L1", "UNIT2-Z1-A3-B04-S2-L1", "UNIT2-Z1-A3-B04-S3-L1", "UNIT2-Z1-A3-B04-S4-L1", "UNIT2-Z1-A3-B05-S1-L1", "UNIT2-Z1-A3-B05-S2-L1", "UNIT2-Z1-A3-B05-S3-L1", "UNIT2-Z1-A3-B05-S4-L1", "UNIT2-Z1-A3-B06-S1-L1", "UNIT2-Z1-A3-B06-S2-L1", "UNIT2-Z1-A3-B06-S3-L1", "UNIT2-Z1-A3-B06-S4-L1", "UNIT2-Z1-A3-B07-S1-L1", "UNIT2-Z1-A3-B07-S2-L1", "UNIT2-Z1-A3-B07-S3-L1", "UNIT2-Z1-A3-B07-S4-L1", "UNIT2-Z1-A3-B08-S1-L1", "UNIT2-Z1-A3-B08-S2-L1", "UNIT2-Z1-A3-B08-S3-L1", "UNIT2-Z1-A3-B08-S4-L1", "UNIT2-Z1-A3-B09-S1-L1", "UNIT2-Z1-A3-B09-S2-L1", "UNIT2-Z1-A3-B09-S3-L1", "UNIT2-Z1-A3-B09-S4-L1", "UNIT2-Z1-A3-B10-S1-L1", "UNIT2-Z1-A3-B10-S2-L1", "UNIT2-Z1-A3-B10-S3-L1", "UNIT2-Z1-A3-B10-S4-L1", "UNIT2-Z1-A4-B01-S1-L1", "UNIT2-Z1-A4-B01-S2-L1", "UNIT2-Z1-A4-B01-S3-L1", "UNIT2-Z1-A4-B01-S4-L1", "UNIT2-Z1-A4-B02-S1-L1", "UNIT2-Z1-A4-B02-S2-L1", "UNIT2-Z1-A4-B02-S3-L1", "UNIT2-Z1-A4-B02-S4-L1", "UNIT2-Z1-A4-B03-S1-L1", "UNIT2-Z1-A4-B03-S2-L1", "UNIT2-Z1-A4-B03-S3-L1", "UNIT2-Z1-A4-B03-S4-L1", "UNIT2-Z1-A4-B04-S1-L1", "UNIT2-Z1-A4-B04-S2-L1", "UNIT2-Z1-A4-B04-S3-L1", "UNIT2-Z1-A4-B04-S4-L1", "UNIT2-Z1-A4-B05-S1-L1", "UNIT2-Z1-A4-B05-S2-L1", "UNIT2-Z1-A4-B05-S3-L1", "UNIT2-Z1-A4-B05-S4-L1", "UNIT2-Z1-A4-B06-S1-L1", "UNIT2-Z1-A4-B06-S2-L1", "UNIT2-Z1-A4-B06-S3-L1", "UNIT2-Z1-A4-B06-S4-L1", "UNIT2-Z1-A4-B07-S1-L1", "UNIT2-Z1-A4-B07-S2-L1", "UNIT2-Z1-A4-B07-S3-L1", "UNIT2-Z1-A4-B07-S4-L1", "UNIT2-Z1-A4-B08-S1-L1", "UNIT2-Z1-A4-B08-S2-L1", "UNIT2-Z1-A4-B08-S3-L1", "UNIT2-Z1-A4-B08-S4-L1", "UNIT2-Z1-A4-B09-S1-L1", "UNIT2-Z1-A4-B09-S2-L1", "UNIT2-Z1-A4-B09-S3-L1", "UNIT2-Z1-A4-B09-S4-L1", "UNIT2-Z1-A4-B10-S1-L1", "UNIT2-Z1-A4-B10-S2-L1", "UNIT2-Z1-A4-B10-S3-L1", "UNIT2-Z1-A4-B10-S4-L1", "UNIT2-Z1-A5-B01-S1-L1", "UNIT2-Z1-A5-B01-S2-L1", "UNIT2-Z1-A5-B01-S3-L1", "UNIT2-Z1-A5-B01-S4-L1", "UNIT2-Z1-A5-B02-S1-L1", "UNIT2-Z1-A5-B02-S2-L1", "UNIT2-Z1-A5-B02-S3-L1", "UNIT2-Z1-A5-B02-S4-L1", "UNIT2-Z1-A5-B03-S1-L1", "UNIT2-Z1-A5-B03-S2-L1", "UNIT2-Z1-A5-B03-S3-L1", "UNIT2-Z1-A5-B03-S4-L1", "UNIT2-Z1-A5-B04-S1-L1", "UNIT2-Z1-A5-B04-S2-L1", "UNIT2-Z1-A5-B04-S3-L1", "UNIT2-Z1-A5-B04-S4-L1", "UNIT2-Z1-A5-B05-S1-L1", "UNIT2-Z1-A5-B05-S2-L1", "UNIT2-Z1-A5-B05-S3-L1", "UNIT2-Z1-A5-B05-S4-L1", "UNIT2-Z1-A5-B06-S1-L1", "UNIT2-Z1-A5-B06-S2-L1", "UNIT2-Z1-A5-B06-S3-L1", "UNIT2-Z1-A5-B06-S4-L1", "UNIT2-Z1-A5-B07-S1-L1", "UNIT2-Z1-A5-B07-S2-L1", "UNIT2-Z1-A5-B07-S3-L1", "UNIT2-Z1-A5-B07-S4-L1", "UNIT2-Z1-A5-B08-S1-L1", "UNIT2-Z1-A5-B08-S2-L1", "UNIT2-Z1-A5-B08-S3-L1", "UNIT2-Z1-A5-B08-S4-L1", "UNIT2-Z1-A5-B09-S1-L1", "UNIT2-Z1-A5-B09-S2-L1", "UNIT2-Z1-A5-B09-S3-L1", "UNIT2-Z1-A5-B09-S4-L1", "UNIT2-Z1-A5-B10-S1-L1", "UNIT2-Z1-A5-B10-S2-L1", "UNIT2-Z1-A5-B10-S3-L1", "UNIT2-Z1-A5-B10-S4-L1", "UNIT2-Z1-A6-B01-S1-L1", "UNIT2-Z1-A6-B01-S2-L1", "UNIT2-Z1-A6-B01-S3-L1", "UNIT2-Z1-A6-B01-S4-L1", "UNIT2-Z1-A6-B02-S1-L1", "UNIT2-Z1-A6-B02-S2-L1", "UNIT2-Z1-A6-B02-S3-L1", "UNIT2-Z1-A6-B02-S4-L1", "UNIT2-Z1-A6-B03-S1-L1", "UNIT2-Z1-A6-B03-S2-L1", "UNIT2-Z1-A6-B03-S3-L1", "UNIT2-Z1-A6-B03-S4-L1", "UNIT2-Z1-A6-B04-S1-L1", "UNIT2-Z1-A6-B04-S2-L1", "UNIT2-Z1-A6-B04-S3-L1", "UNIT2-Z1-A6-B04-S4-L1", "UNIT2-Z1-A6-B05-S1-L1", "UNIT2-Z1-A6-B05-S2-L1", "UNIT2-Z1-A6-B05-S3-L1", "UNIT2-Z1-A6-B05-S4-L1", "UNIT2-Z1-A6-B06-S1-L1", "UNIT2-Z1-A6-B06-S2-L1", "UNIT2-Z1-A6-B06-S3-L1", "UNIT2-Z1-A6-B06-S4-L1", "UNIT2-Z1-A6-B07-S1-L1", "UNIT2-Z1-A6-B07-S2-L1", "UNIT2-Z1-A6-B07-S3-L1", "UNIT2-Z1-A6-B07-S4-L1", "UNIT2-Z1-A6-B08-S1-L1", "UNIT2-Z1-A6-B08-S2-L1", "UNIT2-Z1-A6-B08-S3-L1", "UNIT2-Z1-A6-B08-S4-L1", "UNIT2-Z1-A6-B09-S1-L1", "UNIT2-Z1-A6-B09-S2-L1", "UNIT2-Z1-A6-B09-S3-L1", "UNIT2-Z1-A6-B09-S4-L1", "UNIT2-Z1-A6-B10-S1-L1", "UNIT2-Z1-A6-B10-S2-L1", "UNIT2-Z1-A6-B10-S3-L1", "UNIT2-Z1-A6-B10-S4-L1", "UNIT2-Z1-A7-B01-S1-L1", "UNIT2-Z1-A7-B01-S2-L1", "UNIT2-Z1-A7-B01-S3-L1", "UNIT2-Z1-A7-B01-S4-L1", "UNIT2-Z1-A7-B02-S1-L1", "UNIT2-Z1-A7-B02-S2-L1", "UNIT2-Z1-A7-B02-S3-L1", "UNIT2-Z1-A7-B02-S4-L1", "UNIT2-Z1-A7-B03-S1-L1", "UNIT2-Z1-A7-B03-S2-L1", "UNIT2-Z1-A7-B03-S3-L1", "UNIT2-Z1-A7-B03-S4-L1", "UNIT2-Z1-A7-B04-S1-L1", "UNIT2-Z1-A7-B04-S2-L1", "UNIT2-Z1-A7-B04-S3-L1", "UNIT2-Z1-A7-B04-S4-L1", "UNIT2-Z1-A7-B05-S1-L1", "UNIT2-Z1-A7-B05-S2-L1", "UNIT2-Z1-A7-B05-S3-L1", "UNIT2-Z1-A7-B05-S4-L1", "UNIT2-Z1-A7-B06-S1-L1", "UNIT2-Z1-A7-B06-S2-L1", "UNIT2-Z1-A7-B06-S3-L1", "UNIT2-Z1-A7-B06-S4-L1", "UNIT2-Z1-A7-B07-S1-L1", "UNIT2-Z1-A7-B07-S2-L1", "UNIT2-Z1-A7-B07-S3-L1", "UNIT2-Z1-A7-B07-S4-L1", "UNIT2-Z1-A7-B08-S1-L1", "UNIT2-Z1-A7-B08-S2-L1", "UNIT2-Z1-A7-B08-S3-L1", "UNIT2-Z1-A7-B08-S4-L1", "UNIT2-Z1-A7-B09-S1-L1", "UNIT2-Z1-A7-B09-S2-L1", "UNIT2-Z1-A7-B09-S3-L1", "UNIT2-Z1-A7-B09-S4-L1", "UNIT2-Z1-A7-B10-S1-L1", "UNIT2-Z1-A7-B10-S2-L1", "UNIT2-Z1-A7-B10-S3-L1", "UNIT2-Z1-A7-B10-S4-L1", "UNIT2-Z1-A8-B01-S1-L1", "UNIT2-Z1-A8-B01-S2-L1", "UNIT2-Z1-A8-B01-S3-L1", "UNIT2-Z1-A8-B01-S4-L1", "UNIT2-Z1-A8-B02-S1-L1", "UNIT2-Z1-A8-B02-S2-L1", "UNIT2-Z1-A8-B02-S3-L1", "UNIT2-Z1-A8-B02-S4-L1", "UNIT2-Z1-A8-B03-S1-L1", "UNIT2-Z1-A8-B03-S2-L1", "UNIT2-Z1-A8-B03-S3-L1", "UNIT2-Z1-A8-B03-S4-L1", "UNIT2-Z1-A8-B04-S1-L1", "UNIT2-Z1-A8-B04-S2-L1", "UNIT2-Z1-A8-B04-S3-L1", "UNIT2-Z1-A8-B04-S4-L1", "UNIT2-Z1-A8-B05-S1-L1", "UNIT2-Z1-A8-B05-S2-L1", "UNIT2-Z1-A8-B05-S3-L1", "UNIT2-Z1-A8-B05-S4-L1", "UNIT2-Z1-A8-B06-S1-L1", "UNIT2-Z1-A8-B06-S2-L1", "UNIT2-Z1-A8-B06-S3-L1", "UNIT2-Z1-A8-B06-S4-L1", "UNIT2-Z1-A8-B07-S1-L1", "UNIT2-Z1-A8-B07-S2-L1", "UNIT2-Z1-A8-B07-S3-L1", "UNIT2-Z1-A8-B07-S4-L1", "UNIT2-Z1-A8-B08-S1-L1", "UNIT2-Z1-A8-B08-S2-L1", "UNIT2-Z1-A8-B08-S3-L1", "UNIT2-Z1-A8-B08-S4-L1", "UNIT2-Z1-A8-B09-S1-L1", "UNIT2-Z1-A8-B09-S2-L1", "UNIT2-Z1-A8-B09-S3-L1", "UNIT2-Z1-A8-B09-S4-L1", "UNIT2-Z1-A8-B10-S1-L1", "UNIT2-Z1-A8-B10-S2-L1", "UNIT2-Z1-A8-B10-S3-L1", "UNIT2-Z1-A8-B10-S4-L1"];
+// Products loaded dynamically from SharePoint — see loadProducts()
+let PRODUCTS = [];
+const WAREHOUSES = [{"id": "unit2", "name": "Unit 2 Warehouse", "locations": ["UNIT2-Z1-A1-B01-S1-L1", "UNIT2-Z1-A1-B01-S2-L1", "UNIT2-Z1-A1-B01-S3-L1", "UNIT2-Z1-A1-B01-S4-L1", "UNIT2-Z1-A1-B02-S1-L1", "UNIT2-Z1-A1-B02-S2-L1", "UNIT2-Z1-A1-B02-S3-L1", "UNIT2-Z1-A1-B02-S4-L1", "UNIT2-Z1-A1-B03-S1-L1", "UNIT2-Z1-A1-B03-S2-L1", "UNIT2-Z1-A1-B03-S3-L1", "UNIT2-Z1-A1-B03-S4-L1", "UNIT2-Z1-A1-B04-S1-L1", "UNIT2-Z1-A1-B04-S2-L1", "UNIT2-Z1-A1-B04-S3-L1", "UNIT2-Z1-A1-B04-S4-L1", "UNIT2-Z1-A1-B05-S1-L1", "UNIT2-Z1-A1-B05-S2-L1", "UNIT2-Z1-A1-B05-S3-L1", "UNIT2-Z1-A1-B05-S4-L1", "UNIT2-Z1-A1-B06-S1-L1", "UNIT2-Z1-A1-B06-S2-L1", "UNIT2-Z1-A1-B06-S3-L1", "UNIT2-Z1-A1-B06-S4-L1", "UNIT2-Z1-A1-B07-S1-L1", "UNIT2-Z1-A1-B07-S2-L1", "UNIT2-Z1-A1-B07-S3-L1", "UNIT2-Z1-A1-B07-S4-L1", "UNIT2-Z1-A1-B08-S1-L1", "UNIT2-Z1-A1-B08-S2-L1", "UNIT2-Z1-A1-B08-S3-L1", "UNIT2-Z1-A1-B08-S4-L1", "UNIT2-Z1-A1-B09-S1-L1", "UNIT2-Z1-A1-B09-S2-L1", "UNIT2-Z1-A1-B09-S3-L1", "UNIT2-Z1-A1-B09-S4-L1", "UNIT2-Z1-A1-B10-S1-L1", "UNIT2-Z1-A1-B10-S2-L1", "UNIT2-Z1-A1-B10-S3-L1", "UNIT2-Z1-A1-B10-S4-L1", "UNIT2-Z1-A2-B01-S1-L1", "UNIT2-Z1-A2-B01-S2-L1", "UNIT2-Z1-A2-B01-S3-L1", "UNIT2-Z1-A2-B01-S4-L1", "UNIT2-Z1-A2-B02-S1-L1", "UNIT2-Z1-A2-B02-S2-L1", "UNIT2-Z1-A2-B02-S3-L1", "UNIT2-Z1-A2-B02-S4-L1", "UNIT2-Z1-A2-B03-S1-L1", "UNIT2-Z1-A2-B03-S2-L1", "UNIT2-Z1-A2-B03-S3-L1", "UNIT2-Z1-A2-B03-S4-L1", "UNIT2-Z1-A2-B04-S1-L1", "UNIT2-Z1-A2-B04-S2-L1", "UNIT2-Z1-A2-B04-S3-L1", "UNIT2-Z1-A2-B04-S4-L1", "UNIT2-Z1-A2-B05-S1-L1", "UNIT2-Z1-A2-B05-S2-L1", "UNIT2-Z1-A2-B05-S3-L1", "UNIT2-Z1-A2-B05-S4-L1", "UNIT2-Z1-A2-B06-S1-L1", "UNIT2-Z1-A2-B06-S2-L1", "UNIT2-Z1-A2-B06-S3-L1", "UNIT2-Z1-A2-B06-S4-L1", "UNIT2-Z1-A2-B07-S1-L1", "UNIT2-Z1-A2-B07-S2-L1", "UNIT2-Z1-A2-B07-S3-L1", "UNIT2-Z1-A2-B07-S4-L1", "UNIT2-Z1-A2-B08-S1-L1", "UNIT2-Z1-A2-B08-S2-L1", "UNIT2-Z1-A2-B08-S3-L1", "UNIT2-Z1-A2-B08-S4-L1", "UNIT2-Z1-A2-B09-S1-L1", "UNIT2-Z1-A2-B09-S2-L1", "UNIT2-Z1-A2-B09-S3-L1", "UNIT2-Z1-A2-B09-S4-L1", "UNIT2-Z1-A2-B10-S1-L1", "UNIT2-Z1-A2-B10-S2-L1", "UNIT2-Z1-A2-B10-S3-L1", "UNIT2-Z1-A2-B10-S4-L1", "UNIT2-Z1-A3-B01-S1-L1", "UNIT2-Z1-A3-B01-S2-L1", "UNIT2-Z1-A3-B01-S3-L1", "UNIT2-Z1-A3-B01-S4-L1", "UNIT2-Z1-A3-B02-S1-L1", "UNIT2-Z1-A3-B02-S2-L1", "UNIT2-Z1-A3-B02-S3-L1", "UNIT2-Z1-A3-B02-S4-L1", "UNIT2-Z1-A3-B03-S1-L1", "UNIT2-Z1-A3-B03-S2-L1", "UNIT2-Z1-A3-B03-S3-L1", "UNIT2-Z1-A3-B03-S4-L1", "UNIT2-Z1-A3-B04-S1-L1", "UNIT2-Z1-A3-B04-S2-L1", "UNIT2-Z1-A3-B04-S3-L1", "UNIT2-Z1-A3-B04-S4-L1", "UNIT2-Z1-A3-B05-S1-L1", "UNIT2-Z1-A3-B05-S2-L1", "UNIT2-Z1-A3-B05-S3-L1", "UNIT2-Z1-A3-B05-S4-L1", "UNIT2-Z1-A3-B06-S1-L1", "UNIT2-Z1-A3-B06-S2-L1", "UNIT2-Z1-A3-B06-S3-L1", "UNIT2-Z1-A3-B06-S4-L1", "UNIT2-Z1-A3-B07-S1-L1", "UNIT2-Z1-A3-B07-S2-L1", "UNIT2-Z1-A3-B07-S3-L1", "UNIT2-Z1-A3-B07-S4-L1", "UNIT2-Z1-A3-B08-S1-L1", "UNIT2-Z1-A3-B08-S2-L1", "UNIT2-Z1-A3-B08-S3-L1", "UNIT2-Z1-A3-B08-S4-L1", "UNIT2-Z1-A3-B09-S1-L1", "UNIT2-Z1-A3-B09-S2-L1", "UNIT2-Z1-A3-B09-S3-L1", "UNIT2-Z1-A3-B09-S4-L1", "UNIT2-Z1-A3-B10-S1-L1", "UNIT2-Z1-A3-B10-S2-L1", "UNIT2-Z1-A3-B10-S3-L1", "UNIT2-Z1-A3-B10-S4-L1", "UNIT2-Z1-A4-B01-S1-L1", "UNIT2-Z1-A4-B01-S2-L1", "UNIT2-Z1-A4-B01-S3-L1", "UNIT2-Z1-A4-B01-S4-L1", "UNIT2-Z1-A4-B02-S1-L1", "UNIT2-Z1-A4-B02-S2-L1", "UNIT2-Z1-A4-B02-S3-L1", "UNIT2-Z1-A4-B02-S4-L1", "UNIT2-Z1-A4-B03-S1-L1", "UNIT2-Z1-A4-B03-S2-L1", "UNIT2-Z1-A4-B03-S3-L1", "UNIT2-Z1-A4-B03-S4-L1", "UNIT2-Z1-A4-B04-S1-L1", "UNIT2-Z1-A4-B04-S2-L1", "UNIT2-Z1-A4-B04-S3-L1", "UNIT2-Z1-A4-B04-S4-L1", "UNIT2-Z1-A4-B05-S1-L1", "UNIT2-Z1-A4-B05-S2-L1", "UNIT2-Z1-A4-B05-S3-L1", "UNIT2-Z1-A4-B05-S4-L1", "UNIT2-Z1-A4-B06-S1-L1", "UNIT2-Z1-A4-B06-S2-L1", "UNIT2-Z1-A4-B06-S3-L1", "UNIT2-Z1-A4-B06-S4-L1", "UNIT2-Z1-A4-B07-S1-L1", "UNIT2-Z1-A4-B07-S2-L1", "UNIT2-Z1-A4-B07-S3-L1", "UNIT2-Z1-A4-B07-S4-L1", "UNIT2-Z1-A4-B08-S1-L1", "UNIT2-Z1-A4-B08-S2-L1", "UNIT2-Z1-A4-B08-S3-L1", "UNIT2-Z1-A4-B08-S4-L1", "UNIT2-Z1-A4-B09-S1-L1", "UNIT2-Z1-A4-B09-S2-L1", "UNIT2-Z1-A4-B09-S3-L1", "UNIT2-Z1-A4-B09-S4-L1", "UNIT2-Z1-A4-B10-S1-L1", "UNIT2-Z1-A4-B10-S2-L1", "UNIT2-Z1-A4-B10-S3-L1", "UNIT2-Z1-A4-B10-S4-L1", "UNIT2-Z1-A5-B01-S1-L1", "UNIT2-Z1-A5-B01-S2-L1", "UNIT2-Z1-A5-B01-S3-L1", "UNIT2-Z1-A5-B01-S4-L1", "UNIT2-Z1-A5-B02-S1-L1", "UNIT2-Z1-A5-B02-S2-L1", "UNIT2-Z1-A5-B02-S3-L1", "UNIT2-Z1-A5-B02-S4-L1", "UNIT2-Z1-A5-B03-S1-L1", "UNIT2-Z1-A5-B03-S2-L1", "UNIT2-Z1-A5-B03-S3-L1", "UNIT2-Z1-A5-B03-S4-L1", "UNIT2-Z1-A5-B04-S1-L1", "UNIT2-Z1-A5-B04-S2-L1", "UNIT2-Z1-A5-B04-S3-L1", "UNIT2-Z1-A5-B04-S4-L1", "UNIT2-Z1-A5-B05-S1-L1", "UNIT2-Z1-A5-B05-S2-L1", "UNIT2-Z1-A5-B05-S3-L1", "UNIT2-Z1-A5-B05-S4-L1", "UNIT2-Z1-A5-B06-S1-L1", "UNIT2-Z1-A5-B06-S2-L1", "UNIT2-Z1-A5-B06-S3-L1", "UNIT2-Z1-A5-B06-S4-L1", "UNIT2-Z1-A5-B07-S1-L1", "UNIT2-Z1-A5-B07-S2-L1", "UNIT2-Z1-A5-B07-S3-L1", "UNIT2-Z1-A5-B07-S4-L1", "UNIT2-Z1-A5-B08-S1-L1", "UNIT2-Z1-A5-B08-S2-L1", "UNIT2-Z1-A5-B08-S3-L1", "UNIT2-Z1-A5-B08-S4-L1", "UNIT2-Z1-A5-B09-S1-L1", "UNIT2-Z1-A5-B09-S2-L1", "UNIT2-Z1-A5-B09-S3-L1", "UNIT2-Z1-A5-B09-S4-L1", "UNIT2-Z1-A5-B10-S1-L1", "UNIT2-Z1-A5-B10-S2-L1", "UNIT2-Z1-A5-B10-S3-L1", "UNIT2-Z1-A5-B10-S4-L1", "UNIT2-Z1-A6-B01-S1-L1", "UNIT2-Z1-A6-B01-S2-L1", "UNIT2-Z1-A6-B01-S3-L1", "UNIT2-Z1-A6-B01-S4-L1", "UNIT2-Z1-A6-B02-S1-L1", "UNIT2-Z1-A6-B02-S2-L1", "UNIT2-Z1-A6-B02-S3-L1", "UNIT2-Z1-A6-B02-S4-L1", "UNIT2-Z1-A6-B03-S1-L1", "UNIT2-Z1-A6-B03-S2-L1", "UNIT2-Z1-A6-B03-S3-L1", "UNIT2-Z1-A6-B03-S4-L1", "UNIT2-Z1-A6-B04-S1-L1", "UNIT2-Z1-A6-B04-S2-L1", "UNIT2-Z1-A6-B04-S3-L1", "UNIT2-Z1-A6-B04-S4-L1", "UNIT2-Z1-A6-B05-S1-L1", "UNIT2-Z1-A6-B05-S2-L1", "UNIT2-Z1-A6-B05-S3-L1", "UNIT2-Z1-A6-B05-S4-L1", "UNIT2-Z1-A6-B06-S1-L1", "UNIT2-Z1-A6-B06-S2-L1", "UNIT2-Z1-A6-B06-S3-L1", "UNIT2-Z1-A6-B06-S4-L1", "UNIT2-Z1-A6-B07-S1-L1", "UNIT2-Z1-A6-B07-S2-L1", "UNIT2-Z1-A6-B07-S3-L1", "UNIT2-Z1-A6-B07-S4-L1", "UNIT2-Z1-A6-B08-S1-L1", "UNIT2-Z1-A6-B08-S2-L1", "UNIT2-Z1-A6-B08-S3-L1", "UNIT2-Z1-A6-B08-S4-L1", "UNIT2-Z1-A6-B09-S1-L1", "UNIT2-Z1-A6-B09-S2-L1", "UNIT2-Z1-A6-B09-S3-L1", "UNIT2-Z1-A6-B09-S4-L1", "UNIT2-Z1-A6-B10-S1-L1", "UNIT2-Z1-A6-B10-S2-L1", "UNIT2-Z1-A6-B10-S3-L1", "UNIT2-Z1-A6-B10-S4-L1", "UNIT2-Z1-A7-B01-S1-L1", "UNIT2-Z1-A7-B01-S2-L1", "UNIT2-Z1-A7-B01-S3-L1", "UNIT2-Z1-A7-B01-S4-L1", "UNIT2-Z1-A7-B02-S1-L1", "UNIT2-Z1-A7-B02-S2-L1", "UNIT2-Z1-A7-B02-S3-L1", "UNIT2-Z1-A7-B02-S4-L1", "UNIT2-Z1-A7-B03-S1-L1", "UNIT2-Z1-A7-B03-S2-L1", "UNIT2-Z1-A7-B03-S3-L1", "UNIT2-Z1-A7-B03-S4-L1", "UNIT2-Z1-A7-B04-S1-L1", "UNIT2-Z1-A7-B04-S2-L1", "UNIT2-Z1-A7-B04-S3-L1", "UNIT2-Z1-A7-B04-S4-L1", "UNIT2-Z1-A7-B05-S1-L1", "UNIT2-Z1-A7-B05-S2-L1", "UNIT2-Z1-A7-B05-S3-L1", "UNIT2-Z1-A7-B05-S4-L1", "UNIT2-Z1-A7-B06-S1-L1", "UNIT2-Z1-A7-B06-S2-L1", "UNIT2-Z1-A7-B06-S3-L1", "UNIT2-Z1-A7-B06-S4-L1", "UNIT2-Z1-A7-B07-S1-L1", "UNIT2-Z1-A7-B07-S2-L1", "UNIT2-Z1-A7-B07-S3-L1", "UNIT2-Z1-A7-B07-S4-L1", "UNIT2-Z1-A7-B08-S1-L1", "UNIT2-Z1-A7-B08-S2-L1", "UNIT2-Z1-A7-B08-S3-L1", "UNIT2-Z1-A7-B08-S4-L1", "UNIT2-Z1-A7-B09-S1-L1", "UNIT2-Z1-A7-B09-S2-L1", "UNIT2-Z1-A7-B09-S3-L1", "UNIT2-Z1-A7-B09-S4-L1", "UNIT2-Z1-A7-B10-S1-L1", "UNIT2-Z1-A7-B10-S2-L1", "UNIT2-Z1-A7-B10-S3-L1", "UNIT2-Z1-A7-B10-S4-L1", "UNIT2-Z1-A8-B01-S1-L1", "UNIT2-Z1-A8-B01-S2-L1", "UNIT2-Z1-A8-B01-S3-L1", "UNIT2-Z1-A8-B01-S4-L1", "UNIT2-Z1-A8-B02-S1-L1", "UNIT2-Z1-A8-B02-S2-L1", "UNIT2-Z1-A8-B02-S3-L1", "UNIT2-Z1-A8-B02-S4-L1", "UNIT2-Z1-A8-B03-S1-L1", "UNIT2-Z1-A8-B03-S2-L1", "UNIT2-Z1-A8-B03-S3-L1", "UNIT2-Z1-A8-B03-S4-L1", "UNIT2-Z1-A8-B04-S1-L1", "UNIT2-Z1-A8-B04-S2-L1", "UNIT2-Z1-A8-B04-S3-L1", "UNIT2-Z1-A8-B04-S4-L1", "UNIT2-Z1-A8-B05-S1-L1", "UNIT2-Z1-A8-B05-S2-L1", "UNIT2-Z1-A8-B05-S3-L1", "UNIT2-Z1-A8-B05-S4-L1", "UNIT2-Z1-A8-B06-S1-L1", "UNIT2-Z1-A8-B06-S2-L1", "UNIT2-Z1-A8-B06-S3-L1", "UNIT2-Z1-A8-B06-S4-L1", "UNIT2-Z1-A8-B07-S1-L1", "UNIT2-Z1-A8-B07-S2-L1", "UNIT2-Z1-A8-B07-S3-L1", "UNIT2-Z1-A8-B07-S4-L1", "UNIT2-Z1-A8-B08-S1-L1", "UNIT2-Z1-A8-B08-S2-L1", "UNIT2-Z1-A8-B08-S3-L1", "UNIT2-Z1-A8-B08-S4-L1", "UNIT2-Z1-A8-B09-S1-L1", "UNIT2-Z1-A8-B09-S2-L1", "UNIT2-Z1-A8-B09-S3-L1", "UNIT2-Z1-A8-B09-S4-L1", "UNIT2-Z1-A8-B10-S1-L1", "UNIT2-Z1-A8-B10-S2-L1", "UNIT2-Z1-A8-B10-S3-L1", "UNIT2-Z1-A8-B10-S4-L1"]}, {"id": "unit3", "name": "Unit 3 Production", "locations": ["IBCs / Barrels", "Prep Area", "Loading Bay Racking", "Freezer", "General"]}];
+let activeLocations = [];
+let activeWarehouseName = '';
+function buildLocationSet() { return new Set(activeLocations); }
 
 // Build lookup maps
 const productByCode = {};
@@ -446,7 +520,7 @@ PRODUCTS.forEach(p => {
   if (p.barcode) productByBarcode[p.barcode] = p;
 });
 
-const locationSet = new Set(LOCATIONS);
+// locationSet now built dynamically per warehouse — see buildLocationSet()
 
 // ============================================================
 // CONFIG (loaded from localStorage)
@@ -455,6 +529,7 @@ let CONFIG = {
   siteUrl: '',
   listStockTakes: 'StockTakes',
   listEntries: 'StockTakeEntries',
+  listProducts: 'Products',
   clientId: '',
   tenantId: ''
 };
@@ -470,6 +545,7 @@ function saveSettings() {
   CONFIG.listEntries = document.getElementById('sp-list-entries').value.trim() || 'StockTakeEntries';
   CONFIG.clientId = document.getElementById('sp-client-id').value.trim();
   CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
+  CONFIG.listProducts = document.getElementById('sp-list-products').value.trim() || 'Products';
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
@@ -491,6 +567,7 @@ function loadSettingsUI() {
   document.getElementById('sp-list-entries').value = CONFIG.listEntries;
   document.getElementById('sp-client-id').value = CONFIG.clientId;
   document.getElementById('sp-tenant-id').value = CONFIG.tenantId || '';
+  document.getElementById('sp-list-products').value = CONFIG.listProducts || 'Products';
 }
 
 // ============================================================
@@ -656,6 +733,7 @@ async function getListItems(listName, filter = '') {
     if (listName === CONFIG.listStockTakes) {
       f.StockTakeStatus = f.field_1 || '';
       f.EntryCount = f.field_2 !== undefined ? Number(f.field_2) : 0;
+      f.Warehouse = f.field_3 || '';
     }
     if (listName === CONFIG.listEntries) {
       f.StockTakeId    = f.Title || '';
@@ -665,6 +743,11 @@ async function getListItems(listName, filter = '') {
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
       f.BatchCode      = f.BatchCode || '';
+    }
+    if (listName === CONFIG.listProducts) {
+      f.code        = f.Title || '';
+      f.description = f.field_1 || '';
+      f.barcode     = f.field_2 || '';
     }
     return f;
   });
@@ -763,7 +846,7 @@ function renderStockTakesList(items) {
       <div class="stocktake-item">
         <div>
           <div class="stocktake-name">${st.Title || 'Untitled'}</div>
-          <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
+          <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries${st.Warehouse ? ' · ' + st.Warehouse : ''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
@@ -797,6 +880,29 @@ async function createStockTake() {
   }
 }
 
+async function loadProducts() {
+  try {
+    document.getElementById('product-loading').style.display = 'block';
+    const items = await getListItems(CONFIG.listProducts);
+    PRODUCTS.length = 0;
+    // Rebuild lookup maps
+    Object.keys(productByCode).forEach(k => delete productByCode[k]);
+    Object.keys(productByBarcode).forEach(k => delete productByBarcode[k]);
+    items.forEach(p => {
+      if (!p.code) return;
+      PRODUCTS.push(p);
+      productByCode[p.code.toUpperCase()] = p;
+      if (p.barcode) productByBarcode[p.barcode] = p;
+    });
+    document.getElementById('product-loading').style.display = 'none';
+    console.log(`Loaded ${PRODUCTS.length} products from SharePoint`);
+  } catch(e) {
+    document.getElementById('product-loading').style.display = 'none';
+    toast('Could not load products: ' + e.message, 'error');
+    console.error('loadProducts failed:', e);
+  }
+}
+
 async function openStockTake(st) {
   currentStockTake = st;
   currentLocation = null;
@@ -806,6 +912,11 @@ async function openStockTake(st) {
   document.getElementById('summary-section').style.display = 'none';
   document.getElementById('location-input').value = '';
   document.getElementById('product-search').value = '';
+
+  // Set active warehouse locations
+  const wh = WAREHOUSES.find(w => w.name === st.Warehouse) || WAREHOUSES[0];
+  activeLocations = wh.locations;
+  activeWarehouseName = wh.name;
 
   // Info bar
   document.getElementById('stocktake-info-bar').innerHTML = `
@@ -819,6 +930,9 @@ async function openStockTake(st) {
   `;
 
   showView('count');
+
+  // Load fresh product list from SharePoint
+  await loadProducts();
 
   // Load all existing entries for this stock take
   try {
@@ -865,7 +979,7 @@ function onLocationInput() {
     return;
   }
 
-  locationDropdownItems = LOCATIONS.filter(l => l.toUpperCase().includes(val)).slice(0, 12);
+  locationDropdownItems = activeLocations.filter(l => l.toUpperCase().includes(val)).slice(0, 12);
 
   if (locationDropdownItems.length === 0) {
     dropdown.innerHTML = '<div class="no-results">No matching locations</div>';
@@ -884,7 +998,7 @@ function onLocationKeydown(e) {
   if (dropdown.style.display === 'none') {
     if (e.key === 'Enter') {
       const val = document.getElementById('location-input').value.trim().toUpperCase();
-      if (locationSet.has(val)) selectLocation(val);
+      if (buildLocationSet().has(val)) selectLocation(val);
     }
     return;
   }
@@ -900,7 +1014,7 @@ function onLocationKeydown(e) {
     if (locationHighlightIdx >= 0) selectLocation(locationDropdownItems[locationHighlightIdx]);
     else {
       const val = document.getElementById('location-input').value.trim().toUpperCase();
-      if (locationSet.has(val)) selectLocation(val);
+      if (buildLocationSet().has(val)) selectLocation(val);
     }
     e.preventDefault();
   } else if (e.key === 'Escape') {
@@ -1507,7 +1621,7 @@ function handleScannedCode(code, target) {
   if (target === 'location') {
     // Location barcodes encode the location code directly
     const loc = code.toUpperCase();
-    if (locationSet.has(loc)) {
+    if (buildLocationSet().has(loc)) {
       selectLocation(loc);
     } else {
       document.getElementById('location-input').value = loc;
@@ -1558,6 +1672,54 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ============================================================
+// NEW PRODUCT
+// ============================================================
+function showNewProductModal() {
+  document.getElementById('np-code').value = '';
+  document.getElementById('np-desc').value = '';
+  document.getElementById('np-barcode').value = '';
+  document.getElementById('new-product-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('np-code').focus(), 100);
+}
+
+function closeNewProductModal() {
+  document.getElementById('new-product-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function saveNewProduct() {
+  const code = document.getElementById('np-code').value.trim().toUpperCase();
+  const desc = document.getElementById('np-desc').value.trim();
+  const barcode = document.getElementById('np-barcode').value.trim();
+  if (!code) { toast('Product code is required', 'error'); return; }
+  if (!desc) { toast('Description is required', 'error'); return; }
+
+  // Add to in-memory product list immediately
+  const newProduct = { code, description: desc, barcode: barcode || '', isNew: true };
+  PRODUCTS.push(newProduct);
+  productByCode[code] = newProduct;
+  if (barcode) productByBarcode[barcode] = newProduct;
+
+  closeNewProductModal();
+  selectProduct(newProduct);
+  toast(`Added ${code} — saving to Products list…`, 'success');
+
+  // Save permanently to SharePoint Products list
+  try {
+    await createListItem(CONFIG.listProducts, {
+      Title:   code,        // Product Code
+      field_1: desc,        // Description
+      field_2: barcode || '' // Barcode
+    });
+    toast(`${code} saved to Products list ✓`, 'success');
+  } catch(e) {
+    toast(`Added to count but could not save to Products list: ${e.message}`, 'error');
+    console.error('saveNewProduct SharePoint error:', e);
+  }
+}
+
+// ============================================================
 // EXPORT PANEL
 // ============================================================
 function showExportPanel() {
@@ -1574,69 +1736,71 @@ function closeExportModal() {
 // LOCATIONS VIEW
 // ============================================================
 function showLocationsView() {
-  // Build set of locations that have at least one entry in this stock take
   const countedLocations = new Set(allEntries.map(e => e.LocationCode));
-  const total = LOCATIONS.length;
+  const total = activeLocations.length;
   const counted = countedLocations.size;
   const empty = total - counted;
 
   document.getElementById('lm-title').textContent = currentStockTake.Title + ' — Locations';
   document.getElementById('lm-meta').textContent =
-    `${counted} counted · ${empty} empty · ${total} total`;
+    `${counted} counted · ${empty} empty · ${total} total · ${activeWarehouseName}`;
 
-  // Group locations by aisle (UNIT2-Z1-A1, UNIT2-Z1-A2 etc)
-  const byAisle = {};
-  LOCATIONS.forEach(loc => {
-    const parts = loc.split('-');
-    const aisle = parts.slice(0, 3).join('-'); // e.g. UNIT2-Z1-A1
-    if (!byAisle[aisle]) byAisle[aisle] = [];
-    byAisle[aisle].push(loc);
-  });
+  // Group by aisle/zone for Unit 2 (hyphen-delimited codes), flat for Unit 3
+  const isUnit2 = activeLocations.length > 10 && activeLocations[0] && activeLocations[0].includes('-');
 
-  const aisles = Object.keys(byAisle).sort();
   let bodyHtml = '';
 
-  aisles.forEach(aisle => {
-    const locs = byAisle[aisle];
-    const aisleCountedCount = locs.filter(l => countedLocations.has(l)).length;
-    bodyHtml += `
-      <div style="margin-bottom:20px;">
-        <div style="font-weight:700;font-size:13px;color:#555;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-          <span>${aisle}</span>
-          <span style="font-size:11px;color:#888;">${aisleCountedCount}/${locs.length} counted</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;">
-          ${locs.map(loc => {
-            const isCounted = countedLocations.has(loc);
-            const entries = allEntries.filter(e => e.LocationCode === loc);
-            const totalQty = entries.reduce((s,e) => s + (Number(e.CountQty)||0), 0);
-            const lineCount = entries.length;
-            return `<button
-              onclick="selectLocationFromModal('${loc}')"
-              style="
-                padding:8px 10px;
-                border-radius:6px;
-                border:none;
-                cursor:pointer;
-                text-align:left;
-                background:${isCounted ? '#e8f5e9' : '#ffebee'};
-                border-left:4px solid ${isCounted ? '#2e7d32' : '#c62828'};
-                font-size:12px;
-                line-height:1.4;
-              ">
-              <div style="font-weight:700;color:${isCounted ? '#1b5e20' : '#b71c1c'};">${loc.replace('UNIT2-Z1-','')}</div>
-              <div style="color:${isCounted ? '#388e3c' : '#c62828'};font-size:11px;">
-                ${isCounted ? `${lineCount} line${lineCount!==1?'s':''} · ${totalQty} units` : 'Not counted'}
-              </div>
-            </button>`;
-          }).join('')}
-        </div>
-      </div>`;
-  });
+  if (isUnit2) {
+    const byAisle = {};
+    activeLocations.forEach(loc => {
+      const parts = loc.split('-');
+      const aisle = parts.slice(0, 3).join('-');
+      if (!byAisle[aisle]) byAisle[aisle] = [];
+      byAisle[aisle].push(loc);
+    });
+    Object.keys(byAisle).sort().forEach(aisle => {
+      const locs = byAisle[aisle];
+      const aisleCountedCount = locs.filter(l => countedLocations.has(l)).length;
+      bodyHtml += `
+        <div style="margin-bottom:20px;">
+          <div style="font-weight:700;font-size:13px;color:#555;margin-bottom:8px;display:flex;justify-content:space-between;">
+            <span>${aisle}</span>
+            <span style="font-size:11px;color:#888;">${aisleCountedCount}/${locs.length} counted</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;">
+            ${locs.map(loc => locationTile(loc, countedLocations)).join('')}
+          </div>
+        </div>`;
+    });
+  } else {
+    // Flat list (Unit 3 Production)
+    bodyHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
+      ${activeLocations.map(loc => locationTile(loc, countedLocations)).join('')}
+    </div>`;
+  }
 
   document.getElementById('lm-body').innerHTML = bodyHtml;
   document.getElementById('locations-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
+}
+
+function locationTile(loc, countedLocations) {
+  const isCounted = countedLocations.has(loc);
+  const entries = allEntries.filter(e => e.LocationCode === loc);
+  const totalQty = entries.reduce((s,e) => s + (Number(e.CountQty)||0), 0);
+  const lineCount = entries.length;
+  const label = loc.replace('UNIT2-Z1-','');
+  return `<button
+    onclick="selectLocationFromModal('${loc.replace(/'/g, "\'")}')"
+    style="padding:10px 12px;border-radius:6px;border:none;cursor:pointer;text-align:left;
+      background:${isCounted ? '#e8f5e9' : '#ffebee'};
+      border-left:4px solid ${isCounted ? '#2e7d32' : '#c62828'};
+      font-size:12px;line-height:1.5;">
+    <div style="font-weight:700;color:${isCounted ? '#1b5e20' : '#b71c1c'};">${label}</div>
+    <div style="color:${isCounted ? '#388e3c' : '#c62828'};font-size:11px;">
+      ${isCounted ? `${lineCount} line${lineCount!==1?'s':''} · ${totalQty} units` : 'Not counted'}
+    </div>
+  </button>`;
 }
 
 function closeLocationsModal() {
