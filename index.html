@@ -500,7 +500,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 
 // ============================================================
 // EMBEDDED DATA
@@ -863,18 +863,36 @@ function renderStockTakesList(items) {
 }
 
 async function createStockTake() {
-  const today = new Date();
-  const name = today.toISOString().slice(0, 10); // YYYY-MM-DD
-  const customName = prompt('Stock take name:', name);
-  if (!customName) return;
+  // Populate name field with today's date as a hint, clear warehouse selection
+  document.getElementById('new-st-name').value = '';
+  document.getElementById('new-st-warehouse').value = '';
+  document.getElementById('new-stocktake-modal').style.display = 'flex';
+}
+
+async function confirmCreateStockTake() {
+  const name = document.getElementById('new-st-name').value.trim().toUpperCase();
+  const warehouseId = document.getElementById('new-st-warehouse').value;
+  if (!name) { toast('Please enter a stock take name', 'error'); return; }
+  if (!warehouseId) { toast('Please select a warehouse', 'error'); return; }
+  const warehouse = WAREHOUSES.find(w => w.id === warehouseId);
+  document.getElementById('new-stocktake-modal').style.display = 'none';
   try {
     const item = await createListItem(CONFIG.listStockTakes, {
-      Title: customName,
+      Title: name,
       field_1: 'Open',
       field_2: 0
     });
+    // Try to save warehouse — requires Warehouse column in StockTakes list
+    try {
+      await updateListItem(CONFIG.listStockTakes, item.id, { field_3: warehouse.name });
+    } catch(e) {
+      console.warn('Could not save Warehouse field — add a Warehouse column to StockTakes list:', e.message);
+    }
     toast('Stock take created', 'success');
-    openStockTake({ id: item.id, Title: customName, field_1: 'Open', field_2: 0, Created: new Date().toISOString() });
+    openStockTake({
+      id: item.id, Title: name, StockTakeStatus: 'Open', EntryCount: 0,
+      Warehouse: warehouse.name, Created: new Date().toISOString()
+    });
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
