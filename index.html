@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.8.1";
+const APP_VERSION = "1.8.2";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1035,14 +1035,22 @@ async function loadPreviousEntries() {
     const completed = allSTs
       .filter(s => s.StockTakeStatus === 'Complete' && s.id !== currentStockTake.id)
       .sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
+    console.log('Previous completed stock takes found:', completed.length, completed.map(s => s.Title));
     if (completed.length === 0) return;
     const lastST = completed[0];
-    const prevItems = await getListItems(CONFIG.listEntries, `fields/Title eq '${lastST.id}'`);
+    console.log('Loading entries for previous ST:', lastST.Title, 'id:', lastST.id);
+    // Fetch all entries and filter client-side by StockTakeId (stored in Title field)
+    const allEntryItems = await getListItems(CONFIG.listEntries);
+    const prevItems = allEntryItems.filter(e => String(e.StockTakeId || e.Title || '') === String(lastST.id));
+    console.log('Previous entries found:', prevItems.length);
     prevItems.forEach(e => {
       if (!previousEntries[e.LocationCode]) previousEntries[e.LocationCode] = [];
       previousEntries[e.LocationCode].push(e);
     });
-  } catch {}
+    console.log('Previous locations loaded:', Object.keys(previousEntries).length);
+  } catch(err) {
+    console.error('loadPreviousEntries error:', err);
+  }
 }
 
 // ============================================================
