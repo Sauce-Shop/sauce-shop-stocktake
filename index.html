@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.7.6";
+const APP_VERSION = "1.8.1";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1607,12 +1607,8 @@ function downloadStockTakeCSV() {
     '*Product Code',
     '*Count Quantity',
     'Product Description',
-    'Product Group',
-    'Supplier',
-    'Bin Location',
-    'Base Unit of Measure',
-    'Pack Size',
-    'Batch'
+    'Batch',
+    'Warehouse'
   ];
 
   const rows = Object.values(totals).sort((a, b) =>
@@ -1623,12 +1619,8 @@ function downloadStockTakeCSV() {
     csvEscape(r.code),
     r.total,
     csvEscape(r.description),
-    '',
-    '',
-    csvEscape([...r.locations].join(', ')),
-    '',
-    '',
-    csvEscape(r.batch)
+    csvEscape(r.batch),
+    csvEscape(currentStockTake.Warehouse || '')
   ]);
 
   triggerCSVDownload(
@@ -1662,14 +1654,74 @@ function csvEscape(val) {
 // ============================================================
 let scannerActive = false;
 
-function openScanner(target) {
+// ── Native BarcodeDetector API scanner (preferred) ───────────────────────────
+let nativeScannerStream = null;
+let nativeScannerAnimFrame = null;
+
+async function openScanner(target) {
   scannerTarget = target;
   const isLocation = target === 'location';
   document.getElementById('scanner-label').textContent =
     isLocation ? 'Scan location barcode' : 'Scan product EAN barcode';
   document.getElementById('scanner-overlay').classList.add('active');
 
-  // For products: EAN-13/8 only. For locations: Code 128/39
+  // Try native BarcodeDetector first (Chrome on Android/desktop, Safari 17+)
+  if ('BarcodeDetector' in window) {
+    try {
+      await openNativeScanner();
+      return;
+    } catch(e) {
+      console.warn('Native BarcodeDetector failed, falling back to Quagga:', e);
+    }
+  }
+  // Fallback to Quagga
+  openQuaggaScanner(isLocation);
+}
+
+async function openNativeScanner() {
+  const formats = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'];
+  const detector = new BarcodeDetector({ formats });
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+  });
+  nativeScannerStream = stream;
+
+  const video = document.querySelector('#scanner-container video');
+  video.srcObject = stream;
+  video.setAttribute('playsinline', true);
+  await video.play();
+  scannerActive = true;
+
+  // Accumulate consistent reads
+  const buffer = {};
+  const REQUIRED = 3;
+
+  async function detect() {
+    if (!scannerActive) return;
+    try {
+      const barcodes = await detector.detect(video);
+      for (const barcode of barcodes) {
+        const code = barcode.rawValue;
+        if (!code) continue;
+        buffer[code] = (buffer[code] || 0) + 1;
+        if (buffer[code] >= REQUIRED) {
+          closeScanner();
+          handleScannedCode(code, scannerTarget);
+          return;
+        }
+      }
+    } catch(e) {}
+    nativeScannerAnimFrame = requestAnimationFrame(detect);
+  }
+  nativeScannerAnimFrame = requestAnimationFrame(detect);
+}
+
+// ── Quagga fallback ───────────────────────────────────────────────────────────
+const SCAN_REQUIRED_MATCHES = 3;
+let scanBuffer = {};
+
+function openQuaggaScanner(isLocation) {
   const readers = isLocation
     ? ['code_128_reader', 'code_39_reader']
     : ['ean_reader', 'ean_8_reader'];
@@ -1693,26 +1745,16 @@ function openScanner(target) {
     Quagga.start();
     scannerActive = true;
   });
-
   Quagga.onDetected(onBarcodeDetected);
 }
-
-// Require N consistent reads before accepting — prevents misreads
-const SCAN_REQUIRED_MATCHES = 3;
-let scanBuffer = {};
 
 function onBarcodeDetected(result) {
   const code = result.codeResult.code;
   if (!code) return;
-
-  // Check decodedCodes error rate — reject low-confidence reads
   const errors = result.codeResult.decodedCodes
-    .filter(c => c.error !== undefined)
-    .map(c => c.error);
+    .filter(c => c.error !== undefined).map(c => c.error);
   const avgError = errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : 1;
   if (avgError > 0.15) return;
-
-  // Require 3 consistent reads on all scans
   scanBuffer[code] = (scanBuffer[code] || 0) + 1;
   if (scanBuffer[code] >= SCAN_REQUIRED_MATCHES) {
     scanBuffer = {};
@@ -1723,6 +1765,18 @@ function onBarcodeDetected(result) {
 
 function closeScanner() {
   scanBuffer = {};
+  // Stop native scanner
+  if (nativeScannerAnimFrame) {
+    cancelAnimationFrame(nativeScannerAnimFrame);
+    nativeScannerAnimFrame = null;
+  }
+  if (nativeScannerStream) {
+    nativeScannerStream.getTracks().forEach(t => t.stop());
+    nativeScannerStream = null;
+    const video = document.querySelector('#scanner-container video');
+    if (video) { video.srcObject = null; }
+  }
+  // Stop Quagga
   if (scannerActive) {
     try { Quagga.stop(); } catch(e) {}
     scannerActive = false;
