@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.8.4";
+const APP_VERSION = "1.8.5";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1434,6 +1434,10 @@ async function viewLocationsFromHome(st) {
     // Fully load the stock take into app state so clicking a bay works correctly
     allEntries = entries;
     currentStockTake = st;
+    // Set active warehouse locations — same as openStockTake does
+    const wh = WAREHOUSES.find(w => w.name === st.Warehouse) || WAREHOUSES[0];
+    activeLocations = wh.locations;
+    activeWarehouseName = wh.name;
     await loadPreviousEntries();
     // Mark modal as opened from home so selectLocationFromModal knows to show count view first
     document.getElementById('locations-modal').dataset.fromHome = '1';
