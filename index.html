@@ -384,7 +384,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 
 // ============================================================
 // EMBEDDED DATA
@@ -595,26 +595,43 @@ async function getListId(listName) {
 
 async function getListItems(listName, filter = '') {
   const listId = await getListId(listName);
-  const query = filter ? `?$filter=${encodeURIComponent(filter)}&$expand=fields` : '?$expand=fields&$top=500';
-  const data = await spFetch(`/lists/${listId}/items${query}`);
-  return data.value.map(i => {
+  // Always fetch all items and filter client-side — avoids Graph API $filter/$expand conflicts
+  let url = `/lists/${listId}/items?$expand=fields&$top=500`;
+  let items = [];
+  // Page through all results
+  while (url) {
+    const data = await spFetch(url);
+    items = items.concat(data.value || []);
+    url = data['@odata.nextLink'] ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0/sites/' + await getSiteId(), '') : null;
+  }
+  let mapped = items.map(i => {
     const f = { id: i.id, ...i.fields };
     // Remap SharePoint internal names to friendly names
-    // StockTakes list
-    if (f.field_1 !== undefined && listName === CONFIG.listStockTakes) f.StockTakeStatus = f.field_1;
-    if (f.field_2 !== undefined && listName === CONFIG.listStockTakes) f.EntryCount = f.field_2;
-    // StockTakeEntries list
+    if (listName === CONFIG.listStockTakes) {
+      f.StockTakeStatus = f.field_1 || '';
+      f.EntryCount = f.field_2 !== undefined ? Number(f.field_2) : 0;
+    }
     if (listName === CONFIG.listEntries) {
-      f.StockTakeId = f.Title || f.LinkTitle;  // stored in Title column
-      f.StockTakeName = f.field_1;
-      f.LocationCode  = f.field_2;
-      f.ProductCode   = f.field_3;
-      f.ProductDescription = f.field_4;
-      f.CountQty      = f.field_5 !== undefined ? Number(f.field_5) : 0;
-      f.BatchCode     = f.field_6 || '';
+      f.StockTakeId    = f.Title || '';
+      f.StockTakeName  = f.field_1 || '';
+      f.LocationCode   = f.field_2 || '';
+      f.ProductCode    = f.field_3 || '';
+      f.ProductDescription = f.field_4 || '';
+      f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
+      f.BatchCode      = f.field_6 || '';
     }
     return f;
   });
+  // Apply client-side filter if provided
+  if (filter) {
+    // Parse simple "FieldName eq 'value'" filters
+    const match = filter.match(/(?:fields\/)?(\w+)\s+eq\s+'([^']+)'/);
+    if (match) {
+      const [, field, value] = match;
+      mapped = mapped.filter(item => String(item[field] || '') === value);
+    }
+  }
+  return mapped;
 }
 
 async function createListItem(listName, fields) {
@@ -759,7 +776,7 @@ async function openStockTake(st) {
   // Load all existing entries for this stock take
   try {
     allEntries = await getListItems(CONFIG.listEntries,
-      `Title eq '${st.id}'`);
+      `fields/Title eq '${st.id}'`);
   } catch {
     allEntries = [];
   }
@@ -777,7 +794,7 @@ async function loadPreviousEntries() {
       .sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
     if (completed.length === 0) return;
     const lastST = completed[0];
-    const prevItems = await getListItems(CONFIG.listEntries, `StockTakeId eq '${lastST.id}'`);
+    const prevItems = await getListItems(CONFIG.listEntries, `fields/Title eq '${lastST.id}'`);
     prevItems.forEach(e => {
       if (!previousEntries[e.LocationCode]) previousEntries[e.LocationCode] = [];
       previousEntries[e.LocationCode].push(e);
@@ -1151,7 +1168,7 @@ async function viewFullStockTake(st) {
   modal.style.display = 'block';
   document.body.style.overflow = 'hidden';
   try {
-    const entries = await getListItems(CONFIG.listEntries, `Title eq '${st.id}'`);
+    const entries = await getListItems(CONFIG.listEntries, `fields/Title eq '${st.id}'`);
     // Temporarily set allEntries and currentStockTake so showLiveView works
     const prevEntries = allEntries;
     const prevST = currentStockTake;
@@ -1168,7 +1185,7 @@ async function viewFullStockTake(st) {
 async function viewSummary(st) {
   currentStockTake = st;
   try {
-    allEntries = await getListItems(CONFIG.listEntries, `Title eq '${st.id}'`);
+    allEntries = await getListItems(CONFIG.listEntries, `fields/Title eq '${st.id}'`);
   } catch {
     allEntries = [];
   }
