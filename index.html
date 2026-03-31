@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.3";
 
 // ============================================================
 // EMBEDDED DATA
@@ -796,7 +796,7 @@ async function getListItems(listName, filter = '') {
     if (listName === CONFIG.listStockTakes) {
       f.StockTakeStatus = f.field_1 || '';
       f.EntryCount = f.field_2 !== undefined ? Number(f.field_2) : 0;
-      f.Warehouse = f.field_3 || '';
+      f.Warehouse = f.Warehouse || f.field_3 || ''; // Warehouse column kept its display name
     }
     if (listName === CONFIG.listEntries) {
       f.StockTakeId    = f.Title || '';
@@ -909,7 +909,8 @@ function renderStockTakesList(items) {
       <div class="stocktake-item">
         <div>
           <div class="stocktake-name">${st.Title || 'Untitled'}</div>
-          <div class="stocktake-meta">${st.Warehouse ? `<span style="font-weight:600;color:var(--brand)">${st.Warehouse}</span> · ` : ''}${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
+          ${st.Warehouse ? `<div style="font-size:12px;font-weight:700;color:var(--brand);margin-top:2px;">${st.Warehouse}</div>` : ''}
+        <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
@@ -947,7 +948,7 @@ async function confirmCreateStockTake() {
     });
     // Try to save warehouse — requires Warehouse column in StockTakes list
     try {
-      await updateListItem(CONFIG.listStockTakes, item.id, { field_3: warehouse.name });
+      await updateListItem(CONFIG.listStockTakes, item.id, { Warehouse: warehouse.name });
     } catch(e) {
       console.warn('Could not save Warehouse field — add a Warehouse column to StockTakes list:', e.message);
     }
@@ -1874,10 +1875,19 @@ function showProductDetail(product) {
   const barcodeValue = document.getElementById('ps-barcode-value');
   const barcodeActions = document.getElementById('ps-barcode-actions');
 
+  renderBarcodeSection(product);
+}
+
+function renderBarcodeSection(product) {
+  const barcodeValue = document.getElementById('ps-barcode-value');
+  const barcodeActions = document.getElementById('ps-barcode-actions');
+
   if (product.barcode) {
-    barcodeValue.textContent = product.barcode;
+    barcodeValue.innerHTML = `<span style="font-family:monospace;font-weight:600;">${product.barcode}</span>`;
     barcodeValue.style.color = '#1a1a1a';
-    barcodeActions.innerHTML = `<span style="font-size:11px;color:var(--success);font-weight:600;">✓ Set</span>`;
+    barcodeActions.innerHTML = `
+      <span style="font-size:11px;color:var(--success);font-weight:600;margin-right:8px;">✓ Set</span>
+      <button class="btn btn-sm btn-secondary" onclick="editBarcode()" style="white-space:nowrap;">✏️ Edit</button>`;
   } else {
     barcodeValue.textContent = 'No barcode set';
     barcodeValue.style.color = '#aaa';
@@ -1888,11 +1898,46 @@ function showProductDetail(product) {
   }
 }
 
+function editBarcode() {
+  const barcodeValue = document.getElementById('ps-barcode-value');
+  const barcodeActions = document.getElementById('ps-barcode-actions');
+  const current = psSelectedProduct ? psSelectedProduct.barcode : '';
+
+  barcodeValue.innerHTML = `
+    <input type="text" id="ps-barcode-input" value="${current}"
+      inputmode="numeric" autocomplete="off" spellcheck="false"
+      style="width:100%;padding:6px 10px;border:1.5px solid var(--brand);border-radius:6px;font-size:15px;font-family:monospace;"
+      onkeydown="if(event.key==='Enter')confirmEditBarcode()">`;
+  barcodeActions.innerHTML = `
+    <div style="display:flex;gap:6px;flex-shrink:0;">
+      <button class="btn btn-sm btn-secondary" onclick="openScanner('ps-barcode')" title="Scan">📷</button>
+      <button class="btn btn-sm btn-primary" onclick="confirmEditBarcode()">Save</button>
+      <button class="btn btn-sm btn-secondary" onclick="cancelEditBarcode()">✕</button>
+    </div>`;
+  document.getElementById('ps-barcode-input').focus();
+  document.getElementById('ps-barcode-input').select();
+}
+
+function confirmEditBarcode() {
+  const input = document.getElementById('ps-barcode-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    toast('Barcode cannot be empty', 'error');
+    return;
+  }
+  setPsBarcode(val);
+}
+
+function cancelEditBarcode() {
+  if (psSelectedProduct) renderBarcodeSection(psSelectedProduct);
+}
+
 function setPsBarcode(barcode) {
   if (!psSelectedProduct) return;
   psPendingBarcode = barcode;
-  document.getElementById('ps-barcode-value').textContent = barcode;
-  document.getElementById('ps-barcode-value').style.color = 'var(--brand)';
+  document.getElementById('ps-barcode-value').innerHTML =
+    `<span style="font-family:monospace;font-weight:600;color:var(--brand);">${barcode}</span>`;
   document.getElementById('ps-barcode-actions').innerHTML =
     `<span style="font-size:11px;color:var(--brand);font-weight:600;">Pending save</span>`;
   document.getElementById('ps-save-row').style.display = 'block';
