@@ -563,7 +563,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.7.3";
+const APP_VERSION = "1.7.4";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1664,21 +1664,26 @@ let scannerActive = false;
 
 function openScanner(target) {
   scannerTarget = target;
+  const isLocation = target === 'location';
   document.getElementById('scanner-label').textContent =
-    target === 'location' ? 'Scan location barcode' : 'Scan product EAN barcode';
+    isLocation ? 'Scan location barcode' : 'Scan product EAN barcode';
   document.getElementById('scanner-overlay').classList.add('active');
+
+  // For products: EAN-13/8 only. For locations: Code 128/39
+  const readers = isLocation
+    ? ['code_128_reader', 'code_39_reader']
+    : ['ean_reader', 'ean_8_reader'];
 
   Quagga.init({
     inputStream: {
       name: 'Live',
       type: 'LiveStream',
       target: document.getElementById('scanner-container'),
-      constraints: { facingMode: 'environment', width: 640, height: 480 }
+      constraints: { facingMode: 'environment', width: 1280, height: 720 }
     },
-    decoder: {
-      readers: ['code_128_reader', 'ean_reader', 'ean_8_reader', 'code_39_reader']
-    },
-    locate: true
+    decoder: { readers },
+    locate: true,
+    locator: { patchSize: 'medium', halfSample: true }
   }, (err) => {
     if (err) {
       toast('Camera error: ' + err.message, 'error');
@@ -1692,16 +1697,35 @@ function openScanner(target) {
   Quagga.onDetected(onBarcodeDetected);
 }
 
+// Require N consistent reads before accepting — prevents misreads
+const SCAN_REQUIRED_MATCHES = 3;
+let scanBuffer = {};
+
 function onBarcodeDetected(result) {
   const code = result.codeResult.code;
+  const format = result.codeResult.format;
   if (!code) return;
-  closeScanner();
-  handleScannedCode(code, scannerTarget);
+
+  // Check decodedCodes error rate — reject low-confidence reads
+  const errors = result.codeResult.decodedCodes
+    .filter(c => c.error !== undefined)
+    .map(c => c.error);
+  const avgError = errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : 1;
+  if (avgError > 0.15) return; // too many errors — skip this frame
+
+  // Accumulate consistent reads
+  scanBuffer[code] = (scanBuffer[code] || 0) + 1;
+  if (scanBuffer[code] >= SCAN_REQUIRED_MATCHES) {
+    scanBuffer = {};
+    closeScanner();
+    handleScannedCode(code, scannerTarget);
+  }
 }
 
 function closeScanner() {
+  scanBuffer = {};
   if (scannerActive) {
-    Quagga.stop();
+    try { Quagga.stop(); } catch(e) {}
     scannerActive = false;
   }
   document.getElementById('scanner-overlay').classList.remove('active');
@@ -1781,17 +1805,28 @@ let psPendingBarcode = null;
 let psDropdownItems = [];
 let psHighlightIdx = -1;
 
-function showProductSearch() {
+async function showProductSearch() {
   psSelectedProduct = null;
   psPendingBarcode = null;
   document.getElementById('ps-search').value = '';
   document.getElementById('ps-dropdown').style.display = 'none';
   document.getElementById('ps-detail').style.display = 'none';
-  document.getElementById('ps-empty').style.display = 'block';
   document.getElementById('ps-save-row').style.display = 'none';
   document.getElementById('ps-save-status').style.display = 'none';
   document.getElementById('product-search-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+
+  // Load products if not already loaded
+  if (PRODUCTS.length === 0) {
+    document.getElementById('ps-empty').style.display = 'none';
+    document.getElementById('ps-search').placeholder = 'Loading products…';
+    document.getElementById('ps-search').disabled = true;
+    await loadProducts();
+    document.getElementById('ps-search').placeholder = 'Type product code, name or scan EAN…';
+    document.getElementById('ps-search').disabled = false;
+  }
+
+  document.getElementById('ps-empty').style.display = 'block';
   setTimeout(() => document.getElementById('ps-search').focus(), 100);
 }
 
