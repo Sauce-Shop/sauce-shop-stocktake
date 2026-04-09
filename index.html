@@ -676,7 +676,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.9.1";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1380,12 +1380,15 @@ async function viewLiveWarehouseLocations() {
   try {
     const all = await getListItems(CONFIG.listLiveWarehouse);
     lwEntries = all.filter(e => e.Warehouse === wh.name);
-    // Temporarily swap allEntries so showLocationsView works
-    const prev = allEntries;
+    // Temporarily set state so showLocationsView works without currentStockTake
+    const prevEntries = allEntries;
+    const prevST = currentStockTake;
     allEntries = lwEntries;
+    currentStockTake = { Title: '🏭 ' + wh.name, Warehouse: wh.name };
     document.getElementById('locations-modal').dataset.fromHome = '1';
     showLocationsView();
-    allEntries = prev;
+    allEntries = prevEntries;
+    currentStockTake = prevST;
   } catch(e) {
     toast('Error: ' + e.message, 'error');
   }
