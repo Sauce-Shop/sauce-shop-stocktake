@@ -209,11 +209,24 @@
   </header>
 
   <main>
-    <!-- VIEW: STOCK TAKES LIST -->
+    <!-- VIEW: HOME (tabbed by warehouse) -->
     <div id="view-home" class="view active">
-      <div class="card">
-        <h2>📋 Stock Takes</h2>
-        <div style="display:flex;gap:10px;margin-bottom:0;">
+
+      <!-- Warehouse tabs -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <button id="tab-unit2" onclick="switchWarehouseTab('unit2')"
+          style="flex:1;padding:12px;border:none;background:none;font-size:14px;font-weight:700;color:var(--brand);border-bottom:3px solid var(--brand);cursor:pointer;margin-bottom:-2px;">
+          Unit 2 Warehouse
+        </button>
+        <button id="tab-unit3" onclick="switchWarehouseTab('unit3')"
+          style="flex:1;padding:12px;border:none;background:none;font-size:14px;font-weight:600;color:var(--text-muted);border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-2px;">
+          Unit 3 Production
+        </button>
+      </div>
+
+      <!-- Actions bar -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;gap:10px;">
           <button class="btn btn-primary" style="flex:2" onclick="createStockTake()">
             + New Stock Take
           </button>
@@ -222,6 +235,24 @@
           </button>
         </div>
       </div>
+
+      <!-- Live Warehouse section -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div>
+            <div style="font-weight:700;font-size:15px;">🏭 Live Warehouse</div>
+            <div id="lw-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;">Loading…</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="viewLiveWarehouse()">📋 View</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="viewLiveWarehouseLocations()">🗺 Locations</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="openLiveWarehouseCount()">✏️ Count</button>
+        </div>
+      </div>
+
+      <!-- Stock Takes section -->
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:8px;padding:0 4px;">Stock Takes</div>
       <div id="stocktakes-list">
         <div class="loading"><div class="spinner"></div><br>Loading...</div>
       </div>
@@ -331,6 +362,81 @@
       </div>
     </div>
 
+    <!-- VIEW: LIVE WAREHOUSE COUNT -->
+    <div id="view-livecount" class="view">
+      <div class="card" id="livecount-info-bar"><!-- filled dynamically --></div>
+      <div id="livecount-product-loading" style="display:none;background:#fff8f6;border:1px solid #ffd0c0;border-radius:8px;padding:10px 14px;font-size:13px;color:#e8401c;margin-bottom:4px;">
+        ⏳ Loading product list…
+      </div>
+
+      <!-- Location scan -->
+      <div class="card">
+        <h3>📍 Current Location</h3>
+        <div class="input-with-btn">
+          <div class="search-wrapper" style="flex:1">
+            <input type="text" id="lc-location-input" placeholder="Scan or type location code…"
+              autocomplete="off" autocorrect="off" spellcheck="false"
+              oninput="onLcLocationInput()" onkeydown="onLcLocationKeydown(event)">
+            <div id="lc-location-dropdown" class="search-dropdown" style="display:none"></div>
+          </div>
+          <button class="btn btn-secondary" onclick="openScanner('lc-location')" title="Scan">📷</button>
+        </div>
+      </div>
+
+      <!-- Location contents -->
+      <div id="lc-location-panel" style="display:none">
+        <div class="card">
+          <div class="location-header">
+            <div>
+              <div class="location-code" id="lc-current-location-display"></div>
+              <div class="location-meta" id="lc-location-entry-count"></div>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="clearLcLocation()">Change</button>
+          </div>
+          <div id="lc-location-entries"></div>
+          <div id="lc-no-entries-yet" class="empty" style="display:none">
+            <div class="empty-icon">📦</div><p>No products in this location.<br>Add one below.</p>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="margin-bottom:0;">+ Add Product</h3>
+            <button class="btn btn-secondary btn-sm" onclick="showNewProductModal()">+ New Product</button>
+          </div>
+          <div class="input-with-btn" style="margin-bottom:10px">
+            <div class="search-wrapper" style="flex:1">
+              <input type="text" id="lc-product-search" placeholder="Scan EAN or type product code…"
+                autocomplete="off" autocorrect="off" spellcheck="false"
+                oninput="onLcProductSearch()" onkeydown="onLcProductKeydown(event)">
+              <div id="lc-product-dropdown" class="search-dropdown" style="display:none"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="openScanner('lc-product')" title="Scan">📷</button>
+          </div>
+          <div id="lc-selected-product-preview" style="display:none" class="card" style="background:#f9f9f9;">
+            <div id="lc-sel-prod-code" style="font-weight:700;font-size:15px;"></div>
+            <div id="lc-sel-prod-desc" style="font-size:13px;color:var(--text-muted);"></div>
+          </div>
+          <div class="flex-row" style="margin-bottom:10px;">
+            <div class="form-group" style="flex:0 0 100px;margin-bottom:0;">
+              <label>Qty</label>
+              <input type="number" id="lc-add-qty" value="1" min="0" step="1" inputmode="numeric" style="text-align:center;font-weight:700;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Batch Code</label>
+              <input type="text" id="lc-add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="addLcProductEntry()" id="lc-add-product-btn" disabled>
+            Update Live Warehouse
+          </button>
+        </div>
+        <div class="bottom-actions">
+          <button class="btn btn-secondary" style="flex:1" onclick="goHome()">← Back</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="viewLiveWarehouse()">📋 View</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="viewLiveWarehouseLocations()">🗺 Locations</button>
+        </div>
+      </div>
+    </div>
+
     <!-- VIEW: SETTINGS -->
     <div id="view-settings" class="view">
       <div class="card">
@@ -353,6 +459,10 @@
         <div class="form-group">
           <label>Products List Name</label>
           <input type="text" id="sp-list-products" placeholder="Products" value="Products">
+        </div>
+        <div class="form-group">
+          <label>Live Warehouse List Name</label>
+          <input type="text" id="sp-list-livewarehouse" placeholder="LiveWarehouse" value="LiveWarehouse">
         </div>
         <div class="form-group">
           <label>Azure App Client ID</label>
@@ -566,7 +676,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.8.6";
+const APP_VERSION = "1.9.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -596,6 +706,7 @@ let CONFIG = {
   listStockTakes: 'StockTakes',
   listEntries: 'StockTakeEntries',
   listProducts: 'Products',
+  listLiveWarehouse: 'LiveWarehouse',
   clientId: '',
   tenantId: ''
 };
@@ -612,6 +723,7 @@ function saveSettings() {
   CONFIG.clientId = document.getElementById('sp-client-id').value.trim();
   CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
   CONFIG.listProducts = document.getElementById('sp-list-products').value.trim() || 'Products';
+  CONFIG.listLiveWarehouse = document.getElementById('sp-list-livewarehouse').value.trim() || 'LiveWarehouse';
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
@@ -634,6 +746,7 @@ function loadSettingsUI() {
   document.getElementById('sp-client-id').value = CONFIG.clientId;
   document.getElementById('sp-tenant-id').value = CONFIG.tenantId || '';
   document.getElementById('sp-list-products').value = CONFIG.listProducts || 'Products';
+  document.getElementById('sp-list-livewarehouse').value = CONFIG.listLiveWarehouse || 'LiveWarehouse';
 }
 
 // ============================================================
@@ -719,8 +832,13 @@ function onSignedIn() {
   document.getElementById('app').style.display = 'flex';
   const name = currentAccount.name || currentAccount.username;
   document.getElementById('header-user').textContent = name;
+  // Set initial warehouse state
+  const wh = WAREHOUSES[0];
+  activeLocations = wh.locations;
+  activeWarehouseName = wh.name;
   showView('home');
   loadStockTakes();
+  loadLiveWarehouseMeta();
 }
 
 // Try silent sign-in on load
@@ -815,6 +933,16 @@ async function getListItems(listName, filter = '') {
       f.description = f.field_1 || '';
       f.barcode     = f.field_2 || '';
     }
+    if (listName === CONFIG.listLiveWarehouse) {
+      f.ProductCode        = f.Title || '';
+      f.LocationCode       = f.field_1 || '';
+      f.ProductDescription = f.field_2 || '';
+      f.CountQty           = f.field_3 !== undefined ? Number(f.field_3) : 0;
+      f.BatchCode          = f.field_4 || '';
+      f.Warehouse          = f.field_5 || '';
+      f.LastUpdated        = f.field_6 || '';
+      f.UpdatedBy          = f.field_7 || '';
+    }
     return f;
   });
   // Apply client-side filter if provided
@@ -886,6 +1014,384 @@ function goHome() {
 }
 
 // ============================================================
+// WAREHOUSE TABS
+// ============================================================
+let activeWarehouseTab = 'unit2';
+
+function switchWarehouseTab(id) {
+  activeWarehouseTab = id;
+  const wh = WAREHOUSES.find(w => w.id === id);
+  // Update tab styles
+  ['unit2','unit3'].forEach(tid => {
+    const btn = document.getElementById('tab-' + tid);
+    if (btn) {
+      btn.style.color = tid === id ? 'var(--brand)' : 'var(--text-muted)';
+      btn.style.fontWeight = tid === id ? '700' : '600';
+      btn.style.borderBottom = tid === id ? '3px solid var(--brand)' : '3px solid transparent';
+    }
+  });
+  // Set active locations for this tab
+  activeLocations = wh.locations;
+  activeWarehouseName = wh.name;
+  // Reload stock takes and live warehouse for this tab
+  loadStockTakes();
+  loadLiveWarehouseMeta();
+}
+
+// ============================================================
+// LIVE WAREHOUSE
+// ============================================================
+let lwEntries = [];        // all live warehouse entries for active warehouse
+let lwLocation = null;     // current location in livecount view
+let lwLocationEntries = []; // entries for current location
+let lwSelectedProduct = null;
+
+async function loadLiveWarehouseMeta() {
+  const el = document.getElementById('lw-meta');
+  if (!el) return;
+  el.textContent = 'Loading…';
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+    const mine = all.filter(e => e.Warehouse === wh.name);
+    const locs = new Set(mine.map(e => e.LocationCode));
+    const qty = mine.reduce((s, e) => s + (Number(e.CountQty) || 0), 0);
+    const updated = mine.length ? mine.sort((a,b) => new Date(b.LastUpdated||0) - new Date(a.LastUpdated||0))[0].LastUpdated : null;
+    el.textContent = `${mine.length} lines · ${locs.size} locations · ${qty} units${updated ? ' · Updated ' + formatDate(updated) : ''}`;
+  } catch(e) {
+    el.textContent = 'Could not load';
+  }
+}
+
+async function openLiveWarehouseCount() {
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+  activeLocations = wh.locations;
+  activeWarehouseName = wh.name;
+  lwLocation = null;
+  lwLocationEntries = [];
+  lwSelectedProduct = null;
+
+  document.getElementById('livecount-info-bar').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-weight:700;font-size:17px;">🏭 Live Warehouse</div>
+        <div class="text-muted">${wh.name}</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="goHome()">← Back</button>
+    </div>`;
+
+  document.getElementById('lc-location-panel').style.display = 'none';
+  document.getElementById('lc-location-input').value = '';
+  document.getElementById('lc-product-search').value = '';
+  document.getElementById('livecount-product-loading').style.display = 'block';
+  showView('livecount');
+
+  // Load products and live warehouse entries
+  await loadProducts();
+  document.getElementById('livecount-product-loading').style.display = 'none';
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    lwEntries = all.filter(e => e.Warehouse === wh.name);
+  } catch(e) {
+    lwEntries = [];
+    toast('Could not load live warehouse: ' + e.message, 'error');
+  }
+}
+
+// Location input for live count
+let lcLocDropdownItems = [], lcLocHighlightIdx = -1;
+
+function onLcLocationInput() {
+  const val = document.getElementById('lc-location-input').value.trim().toUpperCase();
+  const dropdown = document.getElementById('lc-location-dropdown');
+  lcLocHighlightIdx = -1;
+  if (val.length < 2) { dropdown.style.display = 'none'; return; }
+  lcLocDropdownItems = activeLocations.filter(l => l.toUpperCase().includes(val)).slice(0, 12);
+  if (!lcLocDropdownItems.length) {
+    dropdown.innerHTML = '<div class="no-results">No matching locations</div>';
+  } else {
+    dropdown.innerHTML = lcLocDropdownItems.map((l, i) =>
+      `<div class="search-option" data-idx="${i}" onclick="selectLcLocation('${l}')">${l}</div>`
+    ).join('');
+  }
+  dropdown.style.display = 'block';
+}
+
+function onLcLocationKeydown(e) {
+  if (e.key === 'Enter') {
+    const val = document.getElementById('lc-location-input').value.trim().toUpperCase();
+    if (lcLocHighlightIdx >= 0) selectLcLocation(lcLocDropdownItems[lcLocHighlightIdx]);
+    else if (buildLocationSet().has(val)) selectLcLocation(val);
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown') {
+    lcLocHighlightIdx = Math.min(lcLocHighlightIdx + 1, lcLocDropdownItems.length - 1);
+    highlightDropdown('lc-location-dropdown', lcLocHighlightIdx); e.preventDefault();
+  } else if (e.key === 'ArrowUp') {
+    lcLocHighlightIdx = Math.max(lcLocHighlightIdx - 1, 0);
+    highlightDropdown('lc-location-dropdown', lcLocHighlightIdx); e.preventDefault();
+  } else if (e.key === 'Escape') {
+    document.getElementById('lc-location-dropdown').style.display = 'none';
+  }
+}
+
+function selectLcLocation(code) {
+  lwLocation = code;
+  document.getElementById('lc-location-input').value = code;
+  document.getElementById('lc-location-dropdown').style.display = 'none';
+  document.getElementById('lc-current-location-display').textContent = code;
+  lwLocationEntries = lwEntries.filter(e => e.LocationCode === code);
+  document.getElementById('lc-location-panel').style.display = 'block';
+  document.getElementById('lc-product-search').value = '';
+  lwSelectedProduct = null;
+  document.getElementById('lc-selected-product-preview').style.display = 'none';
+  document.getElementById('lc-add-product-btn').disabled = true;
+  renderLcLocationEntries();
+}
+
+function clearLcLocation() {
+  lwLocation = null;
+  document.getElementById('lc-location-input').value = '';
+  document.getElementById('lc-location-panel').style.display = 'none';
+  document.getElementById('lc-location-input').focus();
+}
+
+function renderLcLocationEntries() {
+  const container = document.getElementById('lc-location-entries');
+  const noEntries = document.getElementById('lc-no-entries-yet');
+  document.getElementById('lc-location-entry-count').textContent =
+    `${lwLocationEntries.length} product${lwLocationEntries.length !== 1 ? 's' : ''}`;
+
+  if (!lwLocationEntries.length) {
+    container.innerHTML = '';
+    noEntries.style.display = 'block';
+    return;
+  }
+  noEntries.style.display = 'none';
+  container.innerHTML = lwLocationEntries.map(e => `
+    <div class="count-entry" id="lc-entry-row-${e.id}">
+      <div class="entry-info">
+        <div class="entry-code">${e.ProductCode}</div>
+        <div class="entry-desc">${e.ProductDescription || ''}</div>
+        ${e.BatchCode ? `<div style="font-size:11px;color:#888;">Batch: ${e.BatchCode}</div>` : ''}
+      </div>
+      <div class="entry-qty">
+        <button class="qty-btn" onclick="adjustLcQty('${e.id}', -1)">−</button>
+        <input class="qty-input" type="number" value="${e.CountQty}" min="0"
+          onchange="updateLcQty('${e.id}', this.value)"
+          onblur="updateLcQty('${e.id}', this.value)" inputmode="numeric">
+        <button class="qty-btn" onclick="adjustLcQty('${e.id}', 1)">+</button>
+      </div>
+      <button class="del-btn" onclick="deleteLcEntry('${e.id}')" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+// Product search for live count
+let lcProdDropdownItems = [], lcProdHighlightIdx = -1;
+
+function onLcProductSearch() {
+  const val = document.getElementById('lc-product-search').value.trim();
+  const dropdown = document.getElementById('lc-product-dropdown');
+  lcProdHighlightIdx = -1;
+  if (!val) { dropdown.style.display = 'none'; return; }
+  const byBarcode = productByBarcode[val];
+  if (byBarcode && val.length >= 8) {
+    selectLcProduct(byBarcode); dropdown.style.display = 'none'; return;
+  }
+  const upper = val.toUpperCase();
+  lcProdDropdownItems = PRODUCTS.filter(p =>
+    p.code.toUpperCase().includes(upper) || p.description.toUpperCase().includes(upper)
+  ).slice(0, 12);
+  dropdown.innerHTML = lcProdDropdownItems.length
+    ? lcProdDropdownItems.map((p, i) =>
+        `<div class="search-option" data-idx="${i}" onclick="selectLcProduct(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+          <div class="search-option-code">${p.code}</div>
+          <div class="search-option-desc">${p.description}</div>
+        </div>`).join('')
+    : '<div class="no-results">No matching products</div>';
+  dropdown.style.display = 'block';
+}
+
+function onLcProductKeydown(e) {
+  if (e.key === 'ArrowDown') { lcProdHighlightIdx = Math.min(lcProdHighlightIdx+1, lcProdDropdownItems.length-1); highlightDropdown('lc-product-dropdown', lcProdHighlightIdx); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { lcProdHighlightIdx = Math.max(lcProdHighlightIdx-1, 0); highlightDropdown('lc-product-dropdown', lcProdHighlightIdx); e.preventDefault(); }
+  else if (e.key === 'Enter') { if (lcProdHighlightIdx >= 0) selectLcProduct(lcProdDropdownItems[lcProdHighlightIdx]); else if (lcProdDropdownItems.length === 1) selectLcProduct(lcProdDropdownItems[0]); e.preventDefault(); }
+  else if (e.key === 'Escape') document.getElementById('lc-product-dropdown').style.display = 'none';
+}
+
+function selectLcProduct(product) {
+  lwSelectedProduct = product;
+  document.getElementById('lc-product-search').value = product.code;
+  document.getElementById('lc-product-dropdown').style.display = 'none';
+  document.getElementById('lc-selected-product-preview').style.display = 'block';
+  document.getElementById('lc-sel-prod-code').textContent = product.code;
+  document.getElementById('lc-sel-prod-desc').textContent = product.description;
+  document.getElementById('lc-add-product-btn').disabled = false;
+  document.getElementById('lc-add-qty').focus();
+  document.getElementById('lc-add-qty').select();
+}
+
+async function addLcProductEntry() {
+  if (!lwSelectedProduct || !lwLocation) return;
+  const qty = parseInt(document.getElementById('lc-add-qty').value) || 0;
+  const batch = document.getElementById('lc-add-batch').value.trim().toUpperCase();
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+  const now = new Date().toISOString();
+  const updatedBy = currentAccount ? (currentAccount.name || currentAccount.username) : '';
+
+  // Check if same product+batch already exists in this location
+  const existing = lwLocationEntries.find(e =>
+    e.ProductCode === lwSelectedProduct.code && (e.BatchCode || '') === batch
+  );
+
+  if (existing) {
+    await updateLcQty(existing.id, qty, true);
+    toast(`Updated ${lwSelectedProduct.code}: qty now ${qty}`, 'success');
+  } else {
+    try {
+      const item = await createListItem(CONFIG.listLiveWarehouse, {
+        Title:   lwSelectedProduct.code,
+        field_1: lwLocation,
+        field_2: lwSelectedProduct.description || '',
+        field_3: qty,
+        field_4: batch,
+        field_5: wh.name,
+        field_6: now,
+        field_7: updatedBy
+      });
+      const newEntry = {
+        id: item.id, ProductCode: lwSelectedProduct.code,
+        LocationCode: lwLocation, ProductDescription: lwSelectedProduct.description || '',
+        CountQty: qty, BatchCode: batch, Warehouse: wh.name,
+        LastUpdated: now, UpdatedBy: updatedBy
+      };
+      lwEntries.push(newEntry);
+      lwLocationEntries.push(newEntry);
+      renderLcLocationEntries();
+      toast(`Added ${lwSelectedProduct.code}`, 'success');
+    } catch(e) {
+      toast('Error saving: ' + e.message, 'error');
+    }
+  }
+  document.getElementById('lc-product-search').value = '';
+  document.getElementById('lc-selected-product-preview').style.display = 'none';
+  document.getElementById('lc-add-qty').value = '1';
+  document.getElementById('lc-add-batch').value = '';
+  document.getElementById('lc-add-product-btn').disabled = true;
+  lwSelectedProduct = null;
+  document.getElementById('lc-product-search').focus();
+}
+
+async function updateLcQty(entryId, newQty, silent = false) {
+  if (typeof newQty === 'boolean') { silent = newQty; return; }
+  const qty = parseInt(newQty) || 0;
+  const entry = lwEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  entry.CountQty = qty;
+  const now = new Date().toISOString();
+  entry.LastUpdated = now;
+  try {
+    await updateListItem(CONFIG.listLiveWarehouse, entryId, {
+      field_3: qty, field_6: now
+    });
+    if (!silent) toast('Quantity updated', 'success');
+  } catch(e) {
+    if (!silent) toast('Error: ' + e.message, 'error');
+  }
+  renderLcLocationEntries();
+}
+
+function adjustLcQty(entryId, delta) {
+  const entry = lwEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  updateLcQty(entryId, Math.max(0, (entry.CountQty || 0) + delta), true);
+}
+
+async function deleteLcEntry(entryId) {
+  if (!confirm('Remove this product from the live warehouse?')) return;
+  try {
+    await deleteListItem(CONFIG.listLiveWarehouse, entryId);
+    lwEntries = lwEntries.filter(e => e.id !== entryId);
+    lwLocationEntries = lwLocationEntries.filter(e => e.id !== entryId);
+    renderLcLocationEntries();
+    toast('Removed', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function viewLiveWarehouse() {
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    const mine = all.filter(e => e.Warehouse === wh.name);
+    // Reuse live view modal
+    const byLoc = {};
+    mine.forEach(e => {
+      if (!byLoc[e.LocationCode]) byLoc[e.LocationCode] = [];
+      byLoc[e.LocationCode].push(e);
+    });
+    const locs = Object.keys(byLoc).sort();
+    const totalQty = mine.reduce((s,e) => s + (Number(e.CountQty)||0), 0);
+    document.getElementById('lv-title').textContent = '🏭 ' + wh.name + ' — Live Warehouse';
+    document.getElementById('lv-meta').textContent = `${mine.length} lines · ${locs.size || locs.length} locations · ${totalQty} units`;
+    let body = '';
+    if (!locs.length) {
+      body = '<div style="text-align:center;padding:32px;color:#888;">No live warehouse data yet.</div>';
+    } else {
+      locs.forEach(loc => {
+        const entries = byLoc[loc];
+        const locTotal = entries.reduce((s,e) => s+(Number(e.CountQty)||0), 0);
+        body += `<div style="margin-bottom:20px;">
+          <div style="font-weight:800;font-size:14px;color:var(--brand);padding:6px 0;border-bottom:2px solid var(--brand);margin-bottom:8px;display:flex;justify-content:space-between;">
+            <span>${loc}</span><span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:#f5f5f5;">
+              <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Code</th>
+              <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Description</th>
+              <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Batch</th>
+              <th style="padding:6px 8px;text-align:right;color:#666;font-size:11px;text-transform:uppercase;">Qty</th>
+            </tr></thead>
+            <tbody>${entries.map(e => `
+              <tr style="border-bottom:1px solid #f0f0f0;">
+                <td style="padding:7px 8px;font-weight:700;">${e.ProductCode}</td>
+                <td style="padding:7px 8px;color:#555;">${e.ProductDescription||''}</td>
+                <td style="padding:7px 8px;color:#888;font-size:12px;">${e.BatchCode||'—'}</td>
+                <td style="padding:7px 8px;text-align:right;font-weight:700;">${e.CountQty}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      });
+    }
+    document.getElementById('lv-body').innerHTML = body;
+    document.getElementById('liveview-modal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  } catch(e) {
+    toast('Error loading live warehouse: ' + e.message, 'error');
+  }
+}
+
+async function viewLiveWarehouseLocations() {
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+  activeLocations = wh.locations;
+  activeWarehouseName = wh.name;
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    lwEntries = all.filter(e => e.Warehouse === wh.name);
+    // Temporarily swap allEntries so showLocationsView works
+    const prev = allEntries;
+    allEntries = lwEntries;
+    document.getElementById('locations-modal').dataset.fromHome = '1';
+    showLocationsView();
+    allEntries = prev;
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
 // STOCK TAKES LIST
 // ============================================================
 async function loadStockTakes() {
@@ -893,8 +1399,13 @@ async function loadStockTakes() {
   el.innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading…</div>';
   try {
     const items = await getListItems(CONFIG.listStockTakes);
-    items.sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
-    renderStockTakesList(items);
+    const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+    // Filter by active warehouse tab — show unassigned on unit2 tab as fallback
+    const filtered = items.filter(st =>
+      !st.Warehouse || st.Warehouse === wh.name
+    );
+    filtered.sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
+    renderStockTakesList(filtered);
   } catch (e) {
     el.innerHTML = `<div class="card"><div class="setup-warning"><strong>Error loading stock takes:</strong><br>${e.message}<br><br>
       Check your SharePoint configuration in <a href="#" onclick="showSettingsView()">Settings</a>.</div></div>`;
@@ -1034,19 +1545,11 @@ async function openStockTake(st) {
 async function loadPreviousEntries() {
   previousEntries = {};
   try {
-    const allSTs = await getListItems(CONFIG.listStockTakes);
-    const completed = allSTs
-      .filter(s =>
-        s.StockTakeStatus === 'Complete' &&
-        s.id !== currentStockTake.id &&
-        (s.Warehouse || '') === (currentStockTake.Warehouse || '')  // same warehouse only
-      )
-      .sort((a, b) => new Date(b.Created || 0) - new Date(a.Created || 0));
-    if (completed.length === 0) return;
-    const lastST = completed[0];
-    const allEntryItems = await getListItems(CONFIG.listEntries);
-    const prevItems = allEntryItems.filter(e => String(e.StockTakeId || e.Title || '') === String(lastST.id));
-    prevItems.forEach(e => {
+    // Use Live Warehouse as the baseline instead of previous stock take
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    const warehouseName = currentStockTake.Warehouse || '';
+    const mine = all.filter(e => e.Warehouse === warehouseName);
+    mine.forEach(e => {
       if (!previousEntries[e.LocationCode]) previousEntries[e.LocationCode] = [];
       previousEntries[e.LocationCode].push(e);
     });
@@ -1414,16 +1917,41 @@ async function completeStockTake() {
     toast('No entries to complete', 'error');
     return;
   }
-  if (!confirm('Complete this stock take? You will be able to download the CSV.')) return;
+  if (!confirm('Complete this stock take? This will update the Live Warehouse for ' + (currentStockTake.Warehouse || 'this warehouse') + '.')) return;
 
   try {
     await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_1: 'Complete' });
-    currentStockTake.Status = 'Complete';
-    toast('Stock take completed!', 'success');
+    currentStockTake.StockTakeStatus = 'Complete';
+    toast('Updating Live Warehouse…', '');
+    await pushToLiveWarehouse(currentStockTake.Warehouse || '', allEntries);
+    toast('Stock take completed & Live Warehouse updated!', 'success');
     showSummary();
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
+}
+
+async function pushToLiveWarehouse(warehouseName, entries) {
+  if (!warehouseName) return;
+  const now = new Date().toISOString();
+  const updatedBy = currentAccount ? (currentAccount.name || currentAccount.username) : '';
+  // Delete all existing for this warehouse
+  const existing = await getListItems(CONFIG.listLiveWarehouse);
+  const toDelete = existing.filter(e => e.Warehouse === warehouseName);
+  await Promise.all(toDelete.map(e => deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {})));
+  // Write new entries
+  await Promise.all(entries.map(e =>
+    createListItem(CONFIG.listLiveWarehouse, {
+      Title:   e.ProductCode,
+      field_1: e.LocationCode,
+      field_2: e.ProductDescription || '',
+      field_3: e.CountQty,
+      field_4: e.BatchCode || '',
+      field_5: warehouseName,
+      field_6: now,
+      field_7: updatedBy
+    }).catch(err => console.error('LW write error:', err))
+  ));
 }
 
 async function viewLocationsFromHome(st) {
@@ -1668,18 +2196,15 @@ function csvEscape(val) {
 // ============================================================
 let scannerActive = false;
 
-// ── Native BarcodeDetector API scanner (preferred) ───────────────────────────
+// ── Scanner — identical settings for all targets ─────────────────────────────
 let nativeScannerStream = null;
 let nativeScannerAnimFrame = null;
 
 async function openScanner(target) {
   scannerTarget = target;
-  const isLocation = target === 'location';
-  document.getElementById('scanner-label').textContent =
-    isLocation ? 'Scan location barcode' : 'Scan product EAN barcode';
+  document.getElementById('scanner-label').textContent = 'Scan barcode';
   document.getElementById('scanner-overlay').classList.add('active');
 
-  // Try native BarcodeDetector first (Chrome on Android/desktop, Safari 17+)
   if ('BarcodeDetector' in window) {
     try {
       await openNativeScanner();
@@ -1688,8 +2213,7 @@ async function openScanner(target) {
       console.warn('Native BarcodeDetector failed, falling back to Quagga:', e);
     }
   }
-  // Fallback to Quagga
-  openQuaggaScanner(isLocation);
+  openQuaggaScanner();
 }
 
 async function openNativeScanner() {
@@ -1707,7 +2231,6 @@ async function openNativeScanner() {
   await video.play();
   scannerActive = true;
 
-  // Accumulate consistent reads
   const buffer = {};
   const REQUIRED = 3;
 
@@ -1731,23 +2254,19 @@ async function openNativeScanner() {
   nativeScannerAnimFrame = requestAnimationFrame(detect);
 }
 
-// ── Quagga fallback ───────────────────────────────────────────────────────────
+// ── Quagga fallback — identical readers for all targets ───────────────────────
 const SCAN_REQUIRED_MATCHES = 3;
 let scanBuffer = {};
 
-function openQuaggaScanner(isLocation) {
-  const readers = isLocation
-    ? ['code_128_reader', 'code_39_reader']
-    : ['ean_reader', 'ean_8_reader'];
-
+function openQuaggaScanner() {
   Quagga.init({
     inputStream: {
       name: 'Live',
       type: 'LiveStream',
       target: document.getElementById('scanner-container'),
-      constraints: { facingMode: 'environment', width: 1280, height: 720 }
+      constraints: { facingMode: 'environment', width: 1920, height: 1080 }
     },
-    decoder: { readers },
+    decoder: { readers: ['ean_reader', 'ean_8_reader', 'code_128_reader', 'code_39_reader'] },
     locate: true,
     locator: { patchSize: 'medium', halfSample: true }
   }, (err) => {
@@ -1831,9 +2350,30 @@ function handleScannedCode(code, target) {
       onProductSearchModal();
     }
   } else if (target === 'np-barcode') {
-    // Scanned from new product modal
     document.getElementById('np-barcode').value = code;
     toast('EAN scanned: ' + code, 'success');
+  } else if (target === 'lc-location') {
+    const loc = code.toUpperCase();
+    if (buildLocationSet().has(loc)) {
+      selectLcLocation(loc);
+    } else {
+      document.getElementById('lc-location-input').value = loc;
+      onLcLocationInput();
+      toast('Location not found: ' + loc, 'error');
+    }
+  } else if (target === 'lc-product') {
+    const byBarcode = productByBarcode[code];
+    if (byBarcode) {
+      selectLcProduct(byBarcode);
+    } else {
+      const byCode = productByCode[code.toUpperCase()];
+      if (byCode) selectLcProduct(byCode);
+      else {
+        document.getElementById('lc-product-search').value = code;
+        onLcProductSearch();
+        toast('Product not found: ' + code, 'error');
+      }
+    }
   }
 }
 
@@ -2305,6 +2845,10 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.search-wrapper')) {
     document.getElementById('location-dropdown').style.display = 'none';
     document.getElementById('product-dropdown').style.display = 'none';
+    const lcd = document.getElementById('lc-location-dropdown');
+    const lpd = document.getElementById('lc-product-dropdown');
+    if (lcd) lcd.style.display = 'none';
+    if (lpd) lpd.style.display = 'none';
   }
 });
 
