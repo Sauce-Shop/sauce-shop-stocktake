@@ -705,7 +705,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.0.3";
+const APP_VERSION = "2.0.4";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1628,6 +1628,7 @@ function renderStockTakesList(items) {
             ? `<button class="btn btn-primary btn-sm" onclick="openStockTake(${JSON.stringify(st).replace(/"/g, '&quot;')})">Count →</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="viewSummary(${JSON.stringify(st).replace(/"/g, '&quot;')})">Summary</button>`
           }
+          <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
     </div>
@@ -2232,6 +2233,27 @@ async function viewFullStockTake(st) {
     currentStockTake = prevST;
   } catch(e) {
     document.getElementById('lv-body').innerHTML = `<div style="color:#c62828;padding:16px;">Error loading entries: ${e.message}</div>`;
+  }
+}
+
+async function deleteStockTake(stId, stTitle) {
+  if (!confirm(`Delete stock take "${stTitle}"?\n\nThis will permanently delete the stock take and all its entries. This cannot be undone.`)) return;
+
+  try {
+    toast('Deleting…', '');
+
+    // Delete all entries for this stock take
+    const allEntryItems = await getListItems(CONFIG.listEntries);
+    const toDelete = allEntryItems.filter(e => String(e.StockTakeId || e.Title || '') === String(stId));
+    await Promise.all(toDelete.map(e => deleteListItem(CONFIG.listEntries, e.id).catch(() => {})));
+
+    // Delete the stock take itself
+    await deleteListItem(CONFIG.listStockTakes, stId);
+
+    toast(`Deleted "${stTitle}" and ${toDelete.length} entries`, 'success');
+    loadStockTakes();
+  } catch(e) {
+    toast('Error deleting: ' + e.message, 'error');
   }
 }
 
