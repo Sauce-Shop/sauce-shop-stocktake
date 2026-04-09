@@ -705,7 +705,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.0.4";
+const APP_VERSION = "2.0.7";
 
 // ============================================================
 // EMBEDDED DATA
@@ -947,6 +947,7 @@ async function getListItems(listName, filter = '') {
       f.StockTakeStatus = f.field_1 || '';
       f.EntryCount = f.field_2 !== undefined ? Number(f.field_2) : 0;
       f.Warehouse = f.Warehouse || f.field_3 || ''; // Warehouse column kept its display name
+      f.BayAccuracy = f.field_4 || '';
     }
     if (listName === CONFIG.listEntries) {
       f.StockTakeId    = f.Title || '';
@@ -1374,7 +1375,19 @@ async function deleteLcEntry(entryId) {
 }
 
 async function viewLiveWarehouse() {
-  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab);
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
+  if (!wh) { toast('No warehouse selected', 'error'); return; }
+
+  // Ensure modal elements exist before proceeding
+  const titleEl = document.getElementById('lv-title');
+  const metaEl  = document.getElementById('lv-meta');
+  const bodyEl  = document.getElementById('lv-body');
+  const modal   = document.getElementById('liveview-modal');
+  if (!titleEl || !metaEl || !bodyEl || !modal) {
+    toast('View modal not available', 'error');
+    return;
+  }
+
   try {
     const all = await getListItems(CONFIG.listLiveWarehouse);
     const mine = all.filter(e => e.Warehouse === wh.name);
@@ -1386,9 +1399,10 @@ async function viewLiveWarehouse() {
     });
     const locs = Object.keys(byLoc).sort();
     const totalQty = mine.reduce((s,e) => s + (Number(e.CountQty)||0), 0);
-    document.getElementById('lv-title').textContent = '🏭 ' + wh.name + ' — Live Warehouse';
-    document.getElementById('lv-refresh-btn').style.display = 'block';
-    document.getElementById('lv-meta').textContent = `${mine.length} lines · ${locs.size || locs.length} locations · ${totalQty} units`;
+    titleEl.textContent = '🏭 ' + wh.name + ' — Live Warehouse';
+    const lvRefreshBtn = document.getElementById('lv-refresh-btn');
+    if (lvRefreshBtn) lvRefreshBtn.style.display = 'block';
+    metaEl.textContent = `${mine.length} lines · ${locs.size || locs.length} locations · ${totalQty} units`;
     let body = '';
     if (!locs.length) {
       body = '<div style="text-align:center;padding:32px;color:#888;">No live warehouse data yet.</div>';
@@ -1419,8 +1433,8 @@ async function viewLiveWarehouse() {
         </div>`;
       });
     }
-    document.getElementById('lv-body').innerHTML = body;
-    document.getElementById('liveview-modal').style.display = 'block';
+    bodyEl.innerHTML = body;
+    modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
   } catch(e) {
     toast('Error loading live warehouse: ' + e.message, 'error');
@@ -1618,7 +1632,7 @@ function renderStockTakesList(items) {
         <div>
           <div class="stocktake-name">${st.Title || 'Untitled'}</div>
           ${st.Warehouse ? `<div style="font-size:12px;font-weight:700;color:var(--brand);margin-top:2px;">${st.Warehouse}</div>` : ''}
-        <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries</div>
+        <div class="stocktake-meta">${formatDate(st.Created)} · ${st.EntryCount || 0} entries${st.BayAccuracy ? ` · <span style="color:var(--success);font-weight:600;">🎯 ${st.BayAccuracy} bays</span>` : ''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.StockTakeStatus === 'Complete' ? 'badge-complete' : 'badge-open'}">${st.StockTakeStatus || 'Open'}</span>
@@ -2148,10 +2162,16 @@ async function completeStockTake() {
   try {
     await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_1: 'Complete' });
     currentStockTake.StockTakeStatus = 'Complete';
+    // Calculate bay accuracy and save to stock take
+    const wh = WAREHOUSES.find(w => w.name === currentStockTake.Warehouse) || WAREHOUSES[0];
+    const countedBays = new Set(allEntries.map(e => e.LocationCode)).size;
+    const totalBays = wh ? wh.locations.length : 0;
+    const accuracy = totalBays > 0 ? Math.round((countedBays / totalBays) * 100) : 0;
+    try { await updateListItem(CONFIG.listStockTakes, currentStockTake.id, { field_4: countedBays + '/' + totalBays }); } catch {}
     toast('Updating Live Warehouse…', '');
     await pushToLiveWarehouse(currentStockTake.Warehouse || '', allEntries);
     toast('Stock take completed & Live Warehouse updated!', 'success');
-    showSummary();
+    goHome();
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
@@ -3056,7 +3076,8 @@ function showLiveView() {
   const totalProducts = allEntries.length;
   const totalQty = allEntries.reduce((s, e) => s + (Number(e.CountQty) || 0), 0);
 
-  document.getElementById('lv-refresh-btn').style.display = 'none';
+  const lvRefresh = document.getElementById('lv-refresh-btn');
+  if (lvRefresh) lvRefresh.style.display = 'none';
   document.getElementById('lv-title').textContent = currentStockTake.Title;
   document.getElementById('lv-meta').textContent =
     `${locations.length} locations · ${totalProducts} lines · ${totalQty} total units`;
