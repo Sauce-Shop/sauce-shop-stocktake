@@ -676,7 +676,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "1.9.2";
+const APP_VERSION = "1.9.4";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1386,6 +1386,7 @@ async function viewLiveWarehouseLocations() {
     allEntries = lwEntries;
     currentStockTake = { Title: '🏭 ' + wh.name, Warehouse: wh.name };
     document.getElementById('locations-modal').dataset.fromHome = '1';
+    document.getElementById('locations-modal').dataset.fromLiveWarehouse = '1';
     showLocationsView();
     allEntries = prevEntries;
     currentStockTake = prevST;
@@ -1681,7 +1682,9 @@ function renderLocationEntries() {
   }
 
   noEntries.style.display = 'none';
-  container.innerHTML = locationEntries.map((e, i) => `
+
+  // Current count entries
+  let html = locationEntries.map((e, i) => `
     <div class="count-entry" id="entry-row-${e.id}">
       <div class="entry-info">
         <div class="entry-code">${e.ProductCode}</div>
@@ -1699,6 +1702,35 @@ function renderLocationEntries() {
       <button class="del-btn" onclick="deleteEntry('${e.id}')" title="Remove">✕</button>
     </div>
   `).join('');
+
+  // Show any previous entries that haven't been copied yet
+  const prev = previousEntries[currentLocation];
+  if (prev && prev.length > 0) {
+    const alreadyCopied = new Set(
+      locationEntries.map(e => e.ProductCode + '||' + (e.BatchCode || ''))
+    );
+    const remaining = prev.filter(e =>
+      !alreadyCopied.has(e.ProductCode + '||' + (e.BatchCode || ''))
+    );
+    if (remaining.length > 0) {
+      html += `<div style="font-size:12px;color:var(--info);font-weight:600;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:8px;">
+        PREVIOUS COUNT (not yet re-counted)</div>` +
+        remaining.map(e => `
+          <div class="count-entry" style="opacity:0.6">
+            <div class="entry-info">
+              <div class="entry-code">${e.ProductCode}</div>
+              <div class="entry-desc">${e.ProductDescription || ''}</div>
+              <div class="entry-prev" style="color:var(--info)">Last count: ${e.CountQty}${e.BatchCode ? ` · Batch: <strong>${e.BatchCode}</strong>` : ''}</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="copyPrevEntry(${JSON.stringify(e).replace(/"/g, '&quot;')})">
+              Use ↵
+            </button>
+          </div>
+        `).join('');
+    }
+  }
+
+  container.innerHTML = html;
 }
 
 function getPrevQtyHtml(productCode) {
@@ -1975,6 +2007,7 @@ async function viewLocationsFromHome(st) {
     await loadPreviousEntries();
     // Mark modal as opened from home so selectLocationFromModal knows to show count view first
     document.getElementById('locations-modal').dataset.fromHome = '1';
+    document.getElementById('locations-modal').dataset.fromLiveWarehouse = '';
     showLocationsView();
     // Update info bar so count view is ready if they click a bay
     document.getElementById('stocktake-info-bar').innerHTML = `
@@ -2684,6 +2717,10 @@ function closeExportModal() {
 // LOCATIONS VIEW
 // ============================================================
 function showLocationsView() {
+  // Clear live warehouse flag if opened from within count view
+  if (!document.getElementById('locations-modal').dataset.fromHome) {
+    document.getElementById('locations-modal').dataset.fromLiveWarehouse = '';
+  }
   const countedLocations = new Set(allEntries.map(e => e.LocationCode));
   const total = activeLocations.length;
   const counted = countedLocations.size;
@@ -2758,14 +2795,26 @@ function closeLocationsModal() {
 }
 
 function selectLocationFromModal(locCode) {
-  const fromHome = document.getElementById('locations-modal').dataset.fromHome === '1';
+  const modal = document.getElementById('locations-modal');
+  const fromHome = modal.dataset.fromHome === '1';
+  const fromLiveWarehouse = modal.dataset.fromLiveWarehouse === '1';
   closeLocationsModal();
-  document.getElementById('locations-modal').dataset.fromHome = '';
-  if (fromHome) {
-    // Navigate into count view first, then select location
-    showView('count');
+  modal.dataset.fromHome = '';
+  modal.dataset.fromLiveWarehouse = '';
+
+  if (fromLiveWarehouse) {
+    // Route to live warehouse count view
+    if (document.getElementById('view-livecount').classList.contains('active')) {
+      // Already in live count — just select the location
+    } else {
+      openLiveWarehouseCount().then(() => selectLcLocation(locCode));
+      return;
+    }
+    selectLcLocation(locCode);
+  } else {
+    if (fromHome) showView('count');
+    selectLocation(locCode);
   }
-  selectLocation(locCode);
   window.scrollTo(0, 0);
 }
 
