@@ -711,7 +711,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.0.9";
+const APP_VERSION = "2.1.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1425,7 +1425,13 @@ async function viewLiveWarehouse() {
             <button onclick="navigateToLocationFromView('${loc.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--brand);font-weight:800;font-size:14px;cursor:pointer;padding:0;text-decoration:underline dotted;">${loc}</button>
             <span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
           </div>
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+            <colgroup>
+              <col style="width:22%;">
+              <col style="width:38%;">
+              <col style="width:25%;">
+              <col style="width:15%;">
+            </colgroup>
             <thead><tr style="background:#f5f5f5;">
               <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Code</th>
               <th style="padding:6px 8px;text-align:left;color:#666;font-size:11px;text-transform:uppercase;">Description</th>
@@ -1433,10 +1439,10 @@ async function viewLiveWarehouse() {
               <th style="padding:6px 8px;text-align:right;color:#666;font-size:11px;text-transform:uppercase;">Qty</th>
             </tr></thead>
             <tbody>${entries.map(e => `
-              <tr style="border-bottom:1px solid #f0f0f0;">
-                <td style="padding:7px 8px;font-weight:700;">${e.ProductCode}</td>
-                <td style="padding:7px 8px;color:#555;">${e.ProductDescription||''}</td>
-                <td style="padding:7px 8px;color:#888;font-size:12px;">${e.BatchCode||'—'}</td>
+              <tr style="border-bottom:1px solid #f0f0f0;" data-code="${e.ProductCode}" data-desc="${(e.ProductDescription||'').toLowerCase()}" data-batch="${(e.BatchCode||'').toLowerCase()}">
+                <td style="padding:7px 8px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.ProductCode}</td>
+                <td style="padding:7px 8px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.ProductDescription||''}</td>
+                <td style="padding:7px 8px;color:#888;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.BatchCode||'—'}</td>
                 <td style="padding:7px 8px;text-align:right;font-weight:700;">${e.CountQty}</td>
               </tr>`).join('')}
             </tbody>
@@ -3150,9 +3156,38 @@ function showLiveView() {
   document.body.style.overflow = 'hidden';
 }
 
+function filterLiveView() {
+  const q = (document.getElementById('lv-search').value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#lv-body table tr[data-code]');
+  const sections = document.querySelectorAll('#lv-body > div');
+
+  if (!q) {
+    // Show everything
+    rows.forEach(r => r.style.display = '');
+    sections.forEach(s => s.style.display = '');
+    return;
+  }
+
+  // Filter rows
+  rows.forEach(r => {
+    const code  = (r.dataset.code  || '').toLowerCase();
+    const desc  = (r.dataset.desc  || '').toLowerCase();
+    const batch = (r.dataset.batch || '').toLowerCase();
+    r.style.display = (code.includes(q) || desc.includes(q) || batch.includes(q)) ? '' : 'none';
+  });
+
+  // Hide sections where all rows are hidden
+  sections.forEach(section => {
+    const visibleRows = section.querySelectorAll('tr[data-code]:not([style*="none"])');
+    section.style.display = visibleRows.length ? '' : 'none';
+  });
+}
+
 function closeLiveView() {
   document.getElementById('liveview-modal').style.display = 'none';
   document.body.style.overflow = '';
+  const srch = document.getElementById('lv-search');
+  if (srch) srch.value = '';
 }
 
 function navigateToLocationFromView(locCode) {
