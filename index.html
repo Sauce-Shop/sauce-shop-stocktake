@@ -711,7 +711,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.0.8";
+const APP_VERSION = "2.0.9";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1078,6 +1078,8 @@ function switchWarehouseTab(id) {
 // LIVE WAREHOUSE
 // ============================================================
 let lwEntries = [];        // all live warehouse entries for active warehouse
+let liveViewStockTake = null; // stock take currently shown in live view modal (for navigation)
+let liveViewIsLiveWarehouse = false; // whether live view is showing live warehouse
 let lwLocation = null;     // current location in livecount view
 let lwLocationEntries = []; // entries for current location
 let lwSelectedProduct = null;
@@ -1405,6 +1407,8 @@ async function viewLiveWarehouse() {
     });
     const locs = Object.keys(byLoc).sort();
     const totalQty = mine.reduce((s,e) => s + (Number(e.CountQty)||0), 0);
+    liveViewIsLiveWarehouse = true;
+    liveViewStockTake = null;
     titleEl.textContent = '🏭 ' + wh.name + ' — Live Warehouse';
     const lvRefreshBtn = document.getElementById('lv-refresh-btn');
     if (lvRefreshBtn) lvRefreshBtn.style.display = 'block';
@@ -1418,7 +1422,7 @@ async function viewLiveWarehouse() {
         const locTotal = entries.reduce((s,e) => s+(Number(e.CountQty)||0), 0);
         body += `<div style="margin-bottom:20px;">
           <div style="font-weight:800;font-size:14px;color:var(--brand);padding:6px 0;border-bottom:2px solid var(--brand);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-            <button onclick="navigateToLocationFromView('${loc.replace(/'/g,"\\'")}', '${loc.replace(/'/g,"\\'")}', false)" style="background:none;border:none;color:var(--brand);font-weight:800;font-size:14px;cursor:pointer;padding:0;text-decoration:underline dotted;">${loc}</button>
+            <button onclick="navigateToLocationFromView('${loc.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--brand);font-weight:800;font-size:14px;cursor:pointer;padding:0;text-decoration:underline dotted;">${loc}</button>
             <span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -2255,9 +2259,12 @@ async function viewFullStockTake(st) {
     const prevST = currentStockTake;
     allEntries = entries;
     currentStockTake = st;
+    liveViewStockTake = st;
+    liveViewIsLiveWarehouse = false;
     showLiveView();
     allEntries = prevEntries;
     currentStockTake = prevST;
+    // Note: liveViewStockTake stays set so navigation works when user taps a location
   } catch(e) {
     document.getElementById('lv-body').innerHTML = `<div style="color:#c62828;padding:16px;">Error loading entries: ${e.message}</div>`;
   }
@@ -3093,6 +3100,8 @@ function showLiveView() {
   const totalProducts = allEntries.length;
   const totalQty = allEntries.reduce((s, e) => s + (Number(e.CountQty) || 0), 0);
 
+  liveViewIsLiveWarehouse = false;
+  liveViewStockTake = currentStockTake;
   const lvRefresh = document.getElementById('lv-refresh-btn');
   if (lvRefresh) lvRefresh.style.display = 'none';
   document.getElementById('lv-title').textContent = currentStockTake.Title;
@@ -3146,14 +3155,25 @@ function closeLiveView() {
   document.body.style.overflow = '';
 }
 
-function navigateToLocationFromView(locCode, locDisplay, isLiveWarehouse) {
+function navigateToLocationFromView(locCode) {
   closeLiveView();
-  if (isLiveWarehouse) {
+  if (liveViewIsLiveWarehouse) {
     // Navigate to live count view for this location
-    openLiveWarehouseCount().then(() => selectLcLocation(locCode));
+    openLiveWarehouseCount().then(() => {
+      selectLcLocation(locCode);
+      window.scrollTo(0, 0);
+    });
   } else {
     // Navigate to stock take count view for this location
-    if (currentStockTake) {
+    const st = liveViewStockTake || currentStockTake;
+    if (!st) { goHome(); return; }
+    if (st.id !== (currentStockTake && currentStockTake.id)) {
+      // Need to open this stock take first
+      openStockTake(st).then(() => {
+        selectLocation(locCode);
+        window.scrollTo(0, 0);
+      });
+    } else {
       if (!document.getElementById('view-count').classList.contains('active')) {
         showView('count');
       }
