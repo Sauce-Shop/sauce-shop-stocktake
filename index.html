@@ -340,7 +340,10 @@
             </div>
             <div class="form-group" style="margin-bottom:0;">
               <label>Batch Code</label>
-              <input type="text" id="add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+              <div class="input-with-btn">
+                <input type="text" id="add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+                <button class="btn btn-secondary" onclick="openScanner('add-batch')" title="Scan batch code">📷</button>
+              </div>
             </div>
           </div>
           <button class="btn btn-primary btn-full" onclick="addProductEntry()" id="add-product-btn" disabled>
@@ -427,7 +430,10 @@
             </div>
             <div class="form-group" style="margin-bottom:0;">
               <label>Batch Code</label>
-              <input type="text" id="lc-add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+              <div class="input-with-btn">
+                <input type="text" id="lc-add-batch" placeholder="e.g. B240101" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase;">
+                <button class="btn btn-secondary" onclick="openScanner('lc-add-batch')" title="Scan batch code">📷</button>
+              </div>
             </div>
           </div>
           <button class="btn btn-primary btn-full" onclick="addLcProductEntry()" id="lc-add-product-btn" disabled>
@@ -705,7 +711,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.0.7";
+const APP_VERSION = "2.0.8";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1411,8 +1417,9 @@ async function viewLiveWarehouse() {
         const entries = byLoc[loc];
         const locTotal = entries.reduce((s,e) => s+(Number(e.CountQty)||0), 0);
         body += `<div style="margin-bottom:20px;">
-          <div style="font-weight:800;font-size:14px;color:var(--brand);padding:6px 0;border-bottom:2px solid var(--brand);margin-bottom:8px;display:flex;justify-content:space-between;">
-            <span>${loc}</span><span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
+          <div style="font-weight:800;font-size:14px;color:var(--brand);padding:6px 0;border-bottom:2px solid var(--brand);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <button onclick="navigateToLocationFromView('${loc.replace(/'/g,"\\'")}', '${loc.replace(/'/g,"\\'")}', false)" style="background:none;border:none;color:var(--brand);font-weight:800;font-size:14px;cursor:pointer;padding:0;text-decoration:underline dotted;">${loc}</button>
+            <span style="font-weight:400;font-size:12px;color:#888;">${entries.length} line${entries.length!==1?'s':''} · ${locTotal} units</span>
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="background:#f5f5f5;">
@@ -2642,6 +2649,12 @@ function handleScannedCode(code, target) {
         toast('Product not found: ' + code, 'error');
       }
     }
+  } else if (target === 'add-batch') {
+    document.getElementById('add-batch').value = code.toUpperCase();
+    toast('Batch scanned: ' + code, 'success');
+  } else if (target === 'lc-add-batch') {
+    document.getElementById('lc-add-batch').value = code.toUpperCase();
+    toast('Batch scanned: ' + code, 'success');
   } else if (target === 'move-location') {
     const loc = code.toUpperCase();
     if (buildLocationSet().has(loc)) {
@@ -2881,13 +2894,17 @@ async function saveProductBarcode() {
     productByBarcode[psPendingBarcode] = psSelectedProduct;
     psPendingBarcode = null;
 
-    document.getElementById('ps-barcode-value').style.color = '#1a1a1a';
-    document.getElementById('ps-barcode-actions').innerHTML =
-      `<span style="font-size:11px;color:var(--success);font-weight:600;">✓ Set</span>`;
+    // Re-render the barcode section fresh so next scan/edit works cleanly
+    renderBarcodeSection(psSelectedProduct);
     document.getElementById('ps-save-row').style.display = 'none';
     document.getElementById('ps-save-status').style.display = 'block';
     document.getElementById('ps-save-status').textContent = '✓ Barcode saved successfully';
     toast('Barcode saved ✓', 'success');
+    // Auto-clear the success message after 2 seconds
+    setTimeout(() => {
+      const el = document.getElementById('ps-save-status');
+      if (el) el.style.display = 'none';
+    }, 2000);
   } catch(e) {
     btn.disabled = false;
     btn.textContent = '💾 Save Barcode to Products List';
@@ -3127,6 +3144,23 @@ function showLiveView() {
 function closeLiveView() {
   document.getElementById('liveview-modal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function navigateToLocationFromView(locCode, locDisplay, isLiveWarehouse) {
+  closeLiveView();
+  if (isLiveWarehouse) {
+    // Navigate to live count view for this location
+    openLiveWarehouseCount().then(() => selectLcLocation(locCode));
+  } else {
+    // Navigate to stock take count view for this location
+    if (currentStockTake) {
+      if (!document.getElementById('view-count').classList.contains('active')) {
+        showView('count');
+      }
+      selectLocation(locCode);
+      window.scrollTo(0, 0);
+    }
+  }
 }
 
 // ============================================================
