@@ -494,12 +494,20 @@
 <!-- LIVE VIEW MODAL -->
 <div id="liveview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;overflow-y:auto;padding:16px;">
   <div style="background:white;border-radius:12px;max-width:700px;margin:0 auto;overflow:hidden;">
-    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
+    <div style="background:var(--brand);color:white;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;">
+      <div style="flex:1;min-width:0;">
         <div style="font-weight:800;font-size:17px" id="lv-title"></div>
-        <div style="font-size:12px;opacity:0.8" id="lv-meta"></div>
+        <div style="font-size:12px;opacity:0.8;" id="lv-meta"></div>
       </div>
-      <button onclick="closeLiveView()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:14px;">✕ Close</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+        <button id="lv-refresh-btn" onclick="refreshLiveViewModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:16px;display:none;" title="Refresh">↻</button>
+        <button onclick="closeLiveView()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:14px;">✕ Close</button>
+      </div>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:#fafafa;position:sticky;top:65px;z-index:9;">
+      <input type="text" id="lv-search" placeholder="Search product code, name or batch…"
+        autocomplete="off" spellcheck="false" oninput="filterLiveView()"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;background:white;box-sizing:border-box;">
     </div>
     <div style="padding:16px;" id="lv-body"></div>
   </div>
@@ -711,7 +719,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
 
 // ============================================================
 // EMBEDDED DATA
