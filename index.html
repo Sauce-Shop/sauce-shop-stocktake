@@ -757,7 +757,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.2.2";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2352,23 +2352,41 @@ async function pushToLiveWarehouse(warehouseName, entries) {
   if (!warehouseName) return;
   const now = new Date().toISOString();
   const updatedBy = currentAccount ? (currentAccount.name || currentAccount.username) : '';
-  // Delete all existing for this warehouse
+  const BATCH = 5; // SharePoint throttles concurrent writes — process in small batches
+
+  // Delete all existing for this warehouse in batches
   const existing = await getListItems(CONFIG.listLiveWarehouse);
   const toDelete = existing.filter(e => e.Warehouse === warehouseName);
-  await Promise.all(toDelete.map(e => deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {})));
-  // Write new entries
-  await Promise.all(entries.map(e =>
-    createListItem(CONFIG.listLiveWarehouse, {
-      Title:   e.ProductCode,
-      field_1: e.LocationCode,
-      field_2: e.ProductDescription || '',
-      field_3: e.CountQty,
-      field_4: e.BatchCode || '',
-      field_5: warehouseName,
-      field_6: now,
-      field_7: updatedBy
-    }).catch(err => console.error('LW write error:', err))
-  ));
+  toast(`Clearing ${toDelete.length} existing entries…`, '');
+  for (let i = 0; i < toDelete.length; i += BATCH) {
+    await Promise.all(toDelete.slice(i, i + BATCH).map(e =>
+      deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {})
+    ));
+  }
+
+  // Write new entries in batches
+  toast(`Writing ${entries.length} entries to Live Warehouse…`, '');
+  let written = 0;
+  for (let i = 0; i < entries.length; i += BATCH) {
+    const batch = entries.slice(i, i + BATCH);
+    await Promise.all(batch.map(e =>
+      createListItem(CONFIG.listLiveWarehouse, {
+        Title:   e.ProductCode,
+        field_1: e.LocationCode,
+        field_2: e.ProductDescription || '',
+        field_3: e.CountQty,
+        field_4: e.BatchCode || '',
+        field_5: warehouseName,
+        field_6: now,
+        field_7: updatedBy
+      }).catch(err => console.error('LW write error:', err))
+    ));
+    written += batch.length;
+    // Update progress every 20 entries
+    if (written % 20 === 0 || written === entries.length) {
+      toast(`Writing Live Warehouse… ${written}/${entries.length}`, '');
+    }
+  }
 }
 
 async function viewLocationsFromHome(st) {
