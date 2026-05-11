@@ -477,6 +477,10 @@
           <input type="text" id="sp-list-livewarehouse" placeholder="LiveWarehouse" value="LiveWarehouse">
         </div>
         <div class="form-group">
+          <label>Changelog List Name</label>
+          <input type="text" id="sp-list-changelog" placeholder="LiveWarehouseChangelog" value="LiveWarehouseChangelog">
+        </div>
+        <div class="form-group">
           <label>Azure App Client ID</label>
           <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
         </div>
@@ -757,7 +761,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.2.2";
+const APP_VERSION = "2.3.0";
 
 // ============================================================
 // EMBEDDED DATA
@@ -788,6 +792,7 @@ let CONFIG = {
   listEntries: 'StockTakeEntries',
   listProducts: 'Products',
   listLiveWarehouse: 'LiveWarehouse',
+  listChangelog: 'LiveWarehouseChangelog',
   clientId: '',
   tenantId: ''
 };
@@ -805,6 +810,7 @@ function saveSettings() {
   CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
   CONFIG.listProducts = document.getElementById('sp-list-products').value.trim() || 'Products';
   CONFIG.listLiveWarehouse = document.getElementById('sp-list-livewarehouse').value.trim() || 'LiveWarehouse';
+  CONFIG.listChangelog = document.getElementById('sp-list-changelog').value.trim() || 'LiveWarehouseChangelog';
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
@@ -828,6 +834,7 @@ function loadSettingsUI() {
   document.getElementById('sp-tenant-id').value = CONFIG.tenantId || '';
   document.getElementById('sp-list-products').value = CONFIG.listProducts || 'Products';
   document.getElementById('sp-list-livewarehouse').value = CONFIG.listLiveWarehouse || 'LiveWarehouse';
+  document.getElementById('sp-list-changelog').value = CONFIG.listChangelog || 'LiveWarehouseChangelog';
 }
 
 // ============================================================
@@ -1376,6 +1383,7 @@ async function addLcProductEntry() {
       lwEntries.push(newEntry);
       lwLocationEntries.push(newEntry);
       renderLcLocationEntries();
+      logChange('Add', lwSelectedProduct.code, batch, wh.name, null, lwLocation, null, qty);
       toast(`Added ${lwSelectedProduct.code}`, 'success');
     } catch(e) {
       toast('Error saving: ' + e.message, 'error');
@@ -1395,6 +1403,7 @@ async function updateLcQty(entryId, newQty, silent = false) {
   const qty = parseInt(newQty) || 0;
   const entry = lwEntries.find(e => e.id === entryId);
   if (!entry) return;
+  const prevQty = entry.CountQty;
   entry.CountQty = qty;
   const now = new Date().toISOString();
   entry.LastUpdated = now;
@@ -1402,6 +1411,7 @@ async function updateLcQty(entryId, newQty, silent = false) {
     await updateListItem(CONFIG.listLiveWarehouse, entryId, {
       field_3: qty, field_6: now
     });
+    logChange('Update', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, entry.LocationCode, prevQty, qty);
     if (!silent) toast('Quantity updated', 'success');
   } catch(e) {
     if (!silent) toast('Error: ' + e.message, 'error');
@@ -1418,7 +1428,9 @@ function adjustLcQty(entryId, delta) {
 async function deleteLcEntry(entryId) {
   if (!confirm('Remove this product from the live warehouse?')) return;
   try {
+    const delEntry = lwEntries.find(e => e.id === entryId);
     await deleteListItem(CONFIG.listLiveWarehouse, entryId);
+    if (delEntry) logChange('Delete', delEntry.ProductCode, delEntry.BatchCode, delEntry.Warehouse, delEntry.LocationCode, null, delEntry.CountQty, 0);
     lwEntries = lwEntries.filter(e => e.id !== entryId);
     lwLocationEntries = lwLocationEntries.filter(e => e.id !== entryId);
     renderLcLocationEntries();
@@ -1578,6 +1590,31 @@ async function viewLiveWarehouseLocations() {
     currentStockTake = prevST;
   } catch(e) {
     toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// CHANGELOG
+// ============================================================
+async function logChange(action, productCode, batch, warehouse, fromLoc, toLoc, qtyBefore, qtyAfter) {
+  try {
+    const now = new Date().toISOString();
+    const by = currentAccount ? (currentAccount.name || currentAccount.username) : '';
+    await createListItem(CONFIG.listChangelog, {
+      Title:     productCode,
+      field_1:   action,
+      field_2:   fromLoc || '',
+      field_3:   toLoc || '',
+      field_4:   qtyBefore !== null ? qtyBefore : '',
+      field_5:   qtyAfter !== null ? qtyAfter : '',
+      field_6:   batch || '',
+      field_7:   warehouse || '',
+      field_8:   by,
+      field_9:   now
+    });
+  } catch(e) {
+    console.warn('Changelog write failed:', e.message);
+    // Non-fatal — don't block the main operation
   }
 }
 
@@ -1763,6 +1800,7 @@ async function confirmMoveEntry(targetLocation) {
       renderLcLocationEntries();
     }
 
+    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, entry.CountQty + moveQty, moveQty);
     const label = remainingQty > 0 ? ` (${remainingQty} remaining at ${entry.LocationCode})` : '';
     toast(`Moved ${moveQty} to ${targetLocation} ✓${label}`, 'success');
   } catch(e) {
@@ -2387,6 +2425,8 @@ async function pushToLiveWarehouse(warehouseName, entries) {
       toast(`Writing Live Warehouse… ${written}/${entries.length}`, '');
     }
   }
+  // Log a single 'StockTake' event for the completion
+  logChange('StockTake', '—', '', warehouseName, null, null, null, entries.length);
 }
 
 async function viewLocationsFromHome(st) {
