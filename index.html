@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.6";
+const APP_VERSION = "2.5.8";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2439,6 +2439,7 @@ async function logChange(action, productCode, batch, warehouse, fromLoc, toLoc, 
     });
   } catch(e) {
     console.warn('Changelog write failed:', e.message);
+    toast('⚠️ Changelog: ' + e.message, 'error');
     // Non-fatal — don't block the main operation
   }
 }
@@ -2575,9 +2576,15 @@ async function confirmMoveEntry(targetLocation) {
   toast(`Moving ${moveQty} × ${entry.ProductCode} to ${targetLocation}…`, '');
 
   try {
-    // Refresh lwEntries from SharePoint to ensure we have latest state before checking
+    // Refresh lwEntries from SharePoint to ensure we have latest state
     const refreshed = await getListItems(CONFIG.listLiveWarehouse);
     lwEntries = refreshed.filter(e => e.Warehouse === targetWh.name || e.Warehouse === (WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0]).name);
+
+    // Re-find entry from refreshed data so qtyBefore is accurate
+    const freshEntry = lwEntries.find(e => e.id === moveEntryId);
+    if (freshEntry) {
+      entry.CountQty = freshEntry.CountQty;
+    }
 
     // ── Add to target location ────────────────────────────────────────────────
     const existingAtTarget = lwEntries.find(e =>
