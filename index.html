@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.10";
+const APP_VERSION = "2.5.11";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1591,7 +1591,8 @@ async function addLcProductEntry() {
   );
 
   if (existing) {
-    await updateLcQty(existing.id, qty, true);
+    const newTotal = Math.round(((existing.CountQty || 0) + qty) * 1000) / 1000;
+    await updateLcQty(existing.id, newTotal, true);
     toast(`Updated ${lwSelectedProduct.code}: qty now ${qty}`, 'success');
   } else {
     try {
