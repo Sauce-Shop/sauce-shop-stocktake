@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.13";
+const APP_VERSION = "2.5.14";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2642,7 +2642,12 @@ async function confirmMoveEntry(targetLocation) {
       renderLcLocationEntries();
     }
 
-    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, qtyBeforeMove, targetQtyAfter);
+    // Log source location — what left that bay
+    const sourceQtyAfter = remainingQty > 0 ? remainingQty : 0;
+    logChange('Move Out', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, qtyBeforeMove, sourceQtyAfter);
+    // Log target location — what arrived in that bay
+    const targetQtyBefore = targetQtyAfter - moveQty;
+    logChange('Move In', entry.ProductCode, entry.BatchCode, targetWh.name, entry.LocationCode, targetLocation, targetQtyBefore, targetQtyAfter);
     const label = remainingQty > 0 ? ` (${remainingQty} remaining at ${entry.LocationCode})` : '';
     toast(`Moved ${moveQty} to ${targetLocation} ✓${label}`, 'success');
   } catch(e) {
