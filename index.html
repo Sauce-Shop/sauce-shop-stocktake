@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.12";
+const APP_VERSION = "2.5.13";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2598,11 +2598,13 @@ async function confirmMoveEntry(targetLocation) {
       e.Warehouse === targetWh.name
     );
 
+    let targetQtyAfter = moveQty; // default for new entry at target
     if (existingAtTarget) {
       const newQty = existingAtTarget.CountQty + moveQty;
       await updateListItem(CONFIG.listLiveWarehouse, existingAtTarget.id, { field_3: newQty, field_6: now, field_7: updatedBy });
       existingAtTarget.CountQty = newQty;
       existingAtTarget.LastUpdated = now;
+      targetQtyAfter = newQty;
     } else {
       const newItem = await createListItem(CONFIG.listLiveWarehouse, {
         Title:   entry.ProductCode,
@@ -2640,7 +2642,7 @@ async function confirmMoveEntry(targetLocation) {
       renderLcLocationEntries();
     }
 
-    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, qtyBeforeMove, moveQty);
+    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, qtyBeforeMove, targetQtyAfter);
     const label = remainingQty > 0 ? ` (${remainingQty} remaining at ${entry.LocationCode})` : '';
     toast(`Moved ${moveQty} to ${targetLocation} ✓${label}`, 'success');
   } catch(e) {
