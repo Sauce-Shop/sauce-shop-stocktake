@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.8";
+const APP_VERSION = "2.5.10";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2430,8 +2430,8 @@ async function logChange(action, productCode, batch, warehouse, fromLoc, toLoc, 
       field_1:   action,
       field_2:   fromLoc || '',
       field_3:   toLoc || '',
-      field_4:   qtyBefore !== null ? qtyBefore : '',
-      field_5:   qtyAfter !== null ? qtyAfter : '',
+      field_4:   qtyBefore !== null && qtyBefore !== '' ? Number(qtyBefore) : null,
+      field_5:   qtyAfter  !== null && qtyAfter  !== '' ? Number(qtyAfter)  : null,
       field_6:   batch || '',
       field_7:   warehouse || '',
       field_8:   by,
@@ -2566,6 +2566,7 @@ async function confirmMoveEntry(targetLocation) {
 
   const moveQty = parseFloat(document.getElementById('move-qty').value) || entry.CountQty;
   const remainingQty = entry.CountQty - moveQty;
+  const qtyBeforeMove = entry.CountQty; // capture before any mutations
   const targetWh = WAREHOUSES.find(w => w.id === (moveWarehouseTab || activeWarehouseTab)) || WAREHOUSES[0];
 
   closeMoveModal();
@@ -2636,7 +2637,7 @@ async function confirmMoveEntry(targetLocation) {
       renderLcLocationEntries();
     }
 
-    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, entry.CountQty + moveQty, moveQty);
+    logChange('Move', entry.ProductCode, entry.BatchCode, entry.Warehouse, entry.LocationCode, targetLocation, qtyBeforeMove, moveQty);
     const label = remainingQty > 0 ? ` (${remainingQty} remaining at ${entry.LocationCode})` : '';
     toast(`Moved ${moveQty} to ${targetLocation} ✓${label}`, 'success');
   } catch(e) {
