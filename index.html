@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.11";
+const APP_VERSION = "2.5.12";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1591,9 +1591,11 @@ async function addLcProductEntry() {
   );
 
   if (existing) {
-    const newTotal = Math.round(((existing.CountQty || 0) + qty) * 1000) / 1000;
+    // Get the authoritative entry from lwEntries to ensure we have the latest CountQty
+    const lwEntry = lwEntries.find(e => e.id === existing.id) || existing;
+    const newTotal = Math.round(((lwEntry.CountQty || 0) + qty) * 1000) / 1000;
     await updateLcQty(existing.id, newTotal, true);
-    toast(`Updated ${lwSelectedProduct.code}: qty now ${qty}`, 'success');
+    toast(`Updated ${lwSelectedProduct.code}: qty now ${newTotal}`, 'success');
   } else {
     try {
       const item = await createListItem(CONFIG.listLiveWarehouse, {
