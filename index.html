@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.15";
+const APP_VERSION = "2.5.16";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2638,7 +2638,14 @@ async function confirmMoveEntry(targetLocation) {
       lwEntries = lwEntries.filter(e => e.id !== entry.id);
     }
 
-    // Refresh current location view
+    // Refresh from SharePoint and update current location view
+    try {
+      const latest = await getListItems(CONFIG.listLiveWarehouse);
+      const currentWh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
+      lwEntries = latest.filter(e => e.Warehouse === currentWh.name);
+    } catch(e) {
+      // Fall back to in-memory update if refresh fails
+    }
     if (lwLocation) {
       lwLocationEntries = lwEntries.filter(e => e.LocationCode === lwLocation);
       renderLcLocationEntries();
