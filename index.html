@@ -987,7 +987,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.14";
+const APP_VERSION = "2.5.15";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2568,8 +2568,6 @@ async function confirmMoveEntry(targetLocation) {
   if (!entry) return;
 
   const moveQty = parseFloat(document.getElementById('move-qty').value) || entry.CountQty;
-  const remainingQty = entry.CountQty - moveQty;
-  const qtyBeforeMove = entry.CountQty; // capture before any mutations
   const targetWh = WAREHOUSES.find(w => w.id === (moveWarehouseTab || activeWarehouseTab)) || WAREHOUSES[0];
 
   closeMoveModal();
@@ -2580,7 +2578,7 @@ async function confirmMoveEntry(targetLocation) {
   toast(`Moving ${moveQty} × ${entry.ProductCode} to ${targetLocation}…`, '');
 
   try {
-    // Refresh lwEntries from SharePoint to ensure we have latest state
+    // Refresh lwEntries from SharePoint to get latest quantities before move
     const refreshed = await getListItems(CONFIG.listLiveWarehouse);
     lwEntries = refreshed.filter(e => e.Warehouse === targetWh.name || e.Warehouse === (WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0]).name);
 
@@ -2589,6 +2587,10 @@ async function confirmMoveEntry(targetLocation) {
     if (freshEntry) {
       entry.CountQty = freshEntry.CountQty;
     }
+
+    // Now capture qtyBeforeMove from the fresh data
+    const qtyBeforeMove = entry.CountQty;
+    const remainingQty  = entry.CountQty - moveQty;
 
     // ── Add to target location ────────────────────────────────────────────────
     const existingAtTarget = lwEntries.find(e =>
