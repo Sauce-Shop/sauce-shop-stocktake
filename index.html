@@ -980,7 +980,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.18";
+const APP_VERSION = "2.5.23";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1025,15 +1025,15 @@ function loadConfig() {
 }
 
 function saveSettings() {
-  CONFIG.siteUrl = document.getElementById('sp-site-url').value.trim().replace(/\/$/, '');
-  CONFIG.listStockTakes = document.getElementById('sp-list-stocktakes').value.trim() || 'StockTakes';
-  CONFIG.listEntries = document.getElementById('sp-list-entries').value.trim() || 'StockTakeEntries';
-  CONFIG.clientId = document.getElementById('sp-client-id').value.trim();
-  CONFIG.tenantId = document.getElementById('sp-tenant-id').value.trim();
-  CONFIG.listProducts = document.getElementById('sp-list-products').value.trim() || 'Products';
-  CONFIG.listLiveWarehouse = document.getElementById('sp-list-livewarehouse').value.trim() || 'LiveWarehouse';
-  CONFIG.listChangelog = document.getElementById('sp-list-changelog').value.trim() || 'LiveWarehouseChangelog';
-  CONFIG.listUnleashedStock = document.getElementById('sp-list-unleashedstock').value.trim() || 'UnleashedStock';
+  const get = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  CONFIG.siteUrl           = get('sp-site-url').replace(/\/$/, '');
+  CONFIG.listStockTakes    = get('sp-list-stocktakes')    || 'StockTakes';
+  CONFIG.listEntries       = get('sp-list-entries')       || 'StockTakeEntries';
+  CONFIG.clientId          = get('sp-client-id');
+  CONFIG.tenantId          = get('sp-tenant-id');
+  CONFIG.listProducts      = get('sp-list-products')      || 'Products';
+  CONFIG.listLiveWarehouse = get('sp-list-livewarehouse') || 'LiveWarehouse';
+  CONFIG.listChangelog     = get('sp-list-changelog')     || 'LiveWarehouseChangelog';
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
@@ -1043,8 +1043,15 @@ function saveSettings() {
     document.getElementById('settings-status').innerHTML = '<span style="color:#c62828">⚠ Missing: ' + missing.join(', ') + '</span>';
   } else {
     document.getElementById('settings-status').innerHTML = '<span class="text-success">✓ All settings saved</span>';
+    // All good — re-init MSAL then go home after a brief moment
+    if (CONFIG.clientId) initMsal();
+    toast('Settings saved ✓', 'success');
+    setTimeout(() => {
+      goHome();
+    }, 800);
+    return;
   }
-  // Re-init MSAL with new client ID if needed
+  // Has missing fields — re-init MSAL but stay on settings
   if (CONFIG.clientId) initMsal();
   toast('Settings saved', 'success');
 }
@@ -1170,7 +1177,7 @@ async function trySilentSignIn() {
 // ============================================================
 // SHAREPOINT API
 // ============================================================
-async function spFetch(path, options = {}) {
+async function spFetch(path, options = {}, retries = 4) {
   const token = await getToken();
   const siteId = await getSiteId();
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}${path}`;
@@ -1182,6 +1189,13 @@ async function spFetch(path, options = {}) {
       ...(options.headers || {})
     }
   });
+  // Retry on throttle (429) or server error (5xx)
+  if ((res.status === 429 || res.status >= 500) && retries > 0) {
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '2') * 1000;
+    const delay = Math.max(retryAfter, 1000 * (5 - retries));
+    await new Promise(r => setTimeout(r, delay));
+    return spFetch(path, options, retries - 1);
+  }
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`SharePoint error ${res.status}: ${err}`);
@@ -3443,19 +3457,20 @@ async function pushToLiveWarehouse(warehouseName, entries) {
   const existing = await getListItems(CONFIG.listLiveWarehouse);
   const toDelete = existing.filter(e => e.Warehouse === warehouseName);
   toast(`Clearing ${toDelete.length} existing entries…`, '');
-  for (let i = 0; i < toDelete.length; i += BATCH) {
-    await Promise.all(toDelete.slice(i, i + BATCH).map(e =>
-      deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {})
-    ));
+  for (const e of toDelete) {
+    await new Promise(r => setTimeout(r, 100));
+    await deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {});
   }
 
-  // Write new entries in batches
+  // Write new entries sequentially to avoid SharePoint throttling
   toast(`Writing ${entries.length} entries to Live Warehouse…`, '');
   let written = 0;
-  for (let i = 0; i < entries.length; i += BATCH) {
-    const batch = entries.slice(i, i + BATCH);
-    await Promise.all(batch.map(e =>
-      createListItem(CONFIG.listLiveWarehouse, {
+  let failed = 0;
+  for (const e of entries) {
+    // Throttle: wait 200ms between writes to avoid SharePoint rate limits
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      await createListItem(CONFIG.listLiveWarehouse, {
         Title:   e.ProductCode,
         field_1: e.LocationCode,
         field_2: e.ProductDescription || '',
@@ -3464,13 +3479,18 @@ async function pushToLiveWarehouse(warehouseName, entries) {
         field_5: warehouseName,
         field_6: now,
         field_7: updatedBy
-      }).catch(err => console.error('LW write error:', err))
-    ));
-    written += batch.length;
-    // Update progress every 20 entries
-    if (written % 20 === 0 || written === entries.length) {
-      toast(`Writing Live Warehouse… ${written}/${entries.length}`, '');
+      });
+    } catch(err) {
+      console.error('LW write error:', err);
+      failed++;
     }
+    written++;
+    if (written % 5 === 0 || written === entries.length) {
+      toast('Writing Live Warehouse… ' + written + '/' + entries.length + (failed ? ' (' + failed + ' failed)' : ''), '');
+    }
+  }
+  if (failed > 0) {
+    toast(`⚠️ ${failed} entries failed to write — please check the live warehouse`, 'error');
   }
   // Log a single 'StockTake' event for the completion
   logChange('StockTake', '—', '', warehouseName, null, null, null, entries.length);
