@@ -201,9 +201,6 @@
 
 <!-- MAIN APP -->
 <div id="app">
-  <div style="background:#ff0;color:#000;text-align:center;font-weight:800;font-size:13px;padding:7px 16px;letter-spacing:0.5px;position:sticky;top:0;z-index:9999;border-bottom:2px solid #e6c800;">
-    ⚠️ THIS IS A DEVELOPMENT SERVER — DO NOT USE FOR LIVE OPERATIONS ⚠️
-  </div>
 
   <header>
     <div>
@@ -298,7 +295,6 @@
           <div class="location-header">
             <div>
               <div class="location-code" id="current-location-display"></div>
-              <div id="st-nav-arrows" style="padding:4px 0 0;"></div>
               <div class="location-meta" id="location-entry-count"></div>
             </div>
             <button class="btn btn-sm btn-secondary" onclick="clearLocation()">Change</button>
@@ -471,23 +467,23 @@
         </div>
         <div class="form-group">
           <label>Stock Takes List Name</label>
-          <input type="text" id="sp-list-stocktakes" placeholder="DevStockTakes" value="DevStockTakes">
+          <input type="text" id="sp-list-stocktakes" placeholder="StockTakes" value="StockTakes">
         </div>
         <div class="form-group">
           <label>Stock Take Entries List Name</label>
-          <input type="text" id="sp-list-entries" placeholder="DevStockTakeEntries" value="DevStockTakeEntries">
+          <input type="text" id="sp-list-entries" placeholder="StockTakeEntries" value="StockTakeEntries">
         </div>
         <div class="form-group">
           <label>Products List Name</label>
-          <input type="text" id="sp-list-products" placeholder="DevProducts" value="DevProducts">
+          <input type="text" id="sp-list-products" placeholder="Products" value="Products">
         </div>
         <div class="form-group">
           <label>Live Warehouse List Name</label>
-          <input type="text" id="sp-list-livewarehouse" placeholder="DevLiveWarehouse" value="DevLiveWarehouse">
+          <input type="text" id="sp-list-livewarehouse" placeholder="LiveWarehouse" value="LiveWarehouse">
         </div>
         <div class="form-group">
           <label>Changelog List Name</label>
-          <input type="text" id="sp-list-changelog" placeholder="DevChangelog" value="DevChangelog">
+          <input type="text" id="sp-list-changelog" placeholder="LiveWarehouseChangelog" value="LiveWarehouseChangelog">
         </div>
 
         <div class="form-group">
@@ -808,7 +804,6 @@
         </button>
       </div>
     </div>
-    <!-- Progress bar -->
     <div style="height:4px;background:#f0f0f0;">
       <div id="empty-check-bar" style="height:100%;background:var(--brand);transition:width 0.3s;width:0%;"></div>
     </div>
@@ -1018,7 +1013,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.24-dev";
+const APP_VERSION = "2.5.25";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1047,32 +1042,32 @@ PRODUCTS.forEach(p => {
 // ============================================================
 let CONFIG = {
   siteUrl: '',
-  listStockTakes: 'DevStockTakes',
-  listEntries: 'DevStockTakeEntries',
-  listProducts: 'DevProducts',
-  listLiveWarehouse: 'DevLiveWarehouse',
-  listChangelog: 'DevChangelog',
+  listStockTakes: 'StockTakes',
+  listEntries: 'StockTakeEntries',
+  listProducts: 'Products',
+  listLiveWarehouse: 'LiveWarehouse',
+  listChangelog: 'LiveWarehouseChangelog',
   listUnleashedStock: 'DevUnleashedStock',
   clientId: '',
   tenantId: ''
 };
 
 function loadConfig() {
-  const saved = localStorage.getItem('ss_stocktake_config_dev');
+  const saved = localStorage.getItem('ss_stocktake_config');
   if (saved) CONFIG = { ...CONFIG, ...JSON.parse(saved) };
 }
 
 function saveSettings() {
   const get = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
   CONFIG.siteUrl           = get('sp-site-url').replace(/\/$/, '');
-  CONFIG.listStockTakes    = get('sp-list-stocktakes')    || 'DevStockTakes';
-  CONFIG.listEntries       = get('sp-list-entries')       || 'DevStockTakeEntries';
+  CONFIG.listStockTakes    = get('sp-list-stocktakes')    || 'StockTakes';
+  CONFIG.listEntries       = get('sp-list-entries')       || 'StockTakeEntries';
   CONFIG.clientId          = get('sp-client-id');
   CONFIG.tenantId          = get('sp-tenant-id');
-  CONFIG.listProducts      = get('sp-list-products')      || 'DevProducts';
-  CONFIG.listLiveWarehouse = get('sp-list-livewarehouse') || 'DevLiveWarehouse';
-  CONFIG.listChangelog     = get('sp-list-changelog')     || 'DevChangelog';
-  localStorage.setItem('ss_stocktake_config_dev', JSON.stringify(CONFIG));
+  CONFIG.listProducts      = get('sp-list-products')      || 'Products';
+  CONFIG.listLiveWarehouse = get('sp-list-livewarehouse') || 'LiveWarehouse';
+  CONFIG.listChangelog     = get('sp-list-changelog')     || 'LiveWarehouseChangelog';
+  localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
   if (!CONFIG.tenantId) missing.push('Tenant ID');
@@ -1081,11 +1076,15 @@ function saveSettings() {
     document.getElementById('settings-status').innerHTML = '<span style="color:#c62828">⚠ Missing: ' + missing.join(', ') + '</span>';
   } else {
     document.getElementById('settings-status').innerHTML = '<span class="text-success">✓ All settings saved</span>';
+    // All good — re-init MSAL then go home after a brief moment
     if (CONFIG.clientId) initMsal();
     toast('Settings saved ✓', 'success');
-    setTimeout(() => { goHome(); }, 800);
+    setTimeout(() => {
+      goHome();
+    }, 800);
     return;
   }
+  // Has missing fields — re-init MSAL but stay on settings
   if (CONFIG.clientId) initMsal();
   toast('Settings saved', 'success');
 }
@@ -1097,9 +1096,9 @@ function loadSettingsUI() {
   set('sp-list-entries',      CONFIG.listEntries);
   set('sp-client-id',         CONFIG.clientId);
   set('sp-tenant-id',         CONFIG.tenantId || '');
-  set('sp-list-products',     CONFIG.listProducts || 'DevProducts');
-  set('sp-list-livewarehouse', CONFIG.listLiveWarehouse || 'DevLiveWarehouse');
-  set('sp-list-changelog',    CONFIG.listChangelog || 'DevChangelog');
+  set('sp-list-products',     CONFIG.listProducts || 'Products');
+  set('sp-list-livewarehouse', CONFIG.listLiveWarehouse || 'LiveWarehouse');
+  set('sp-list-changelog',    CONFIG.listChangelog || 'LiveWarehouseChangelog');
 }
 
 // ============================================================
@@ -1288,7 +1287,7 @@ async function getListItems(listName, filter = '') {
       f.ProductCode    = f.field_3 || '';
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
-      f.BatchCode      = f.field_6 || '';
+      f.BatchCode      = f.BatchCode || '';
     }
     if (listName === CONFIG.listProducts) {
       f.code        = f.Title || '';
@@ -1539,6 +1538,7 @@ function selectLcLocation(code) {
   lwLocation = code;
   document.getElementById('lc-location-input').value = code;
   document.getElementById('lc-location-dropdown').style.display = 'none';
+  renderNavArrows('lc-nav-arrows', code, 'selectLcLocation');
   document.getElementById('lc-current-location-display').textContent = code;
   lwLocationEntries = lwEntries.filter(e => e.LocationCode === code);
   document.getElementById('lc-location-panel').style.display = 'block';
@@ -1893,126 +1893,6 @@ async function viewLiveWarehouseLocations() {
   } catch(e) {
     toast('Error: ' + e.message, 'error');
   }
-}
-
-// ============================================================
-// LOCATION NAVIGATION
-// ============================================================
-function parseLocation(loc) {
-  // Parse A-01-01, QA-01-01, I-01-01 etc. into parts
-  // Returns { aisle, bay, shelf } or null if no numeric pattern
-  const m = loc.match(/^([A-Za-z]+)-(\d+)-(\d+)$/);
-  if (!m) return null;
-  return { aisle: m[1].toUpperCase(), bay: parseInt(m[2]), shelf: parseInt(m[3]) };
-}
-
-function formatLocation(aisle, bay, shelf) {
-  return `${aisle}-${String(bay).padStart(2,'0')}-${String(shelf).padStart(2,'0')}`;
-}
-
-function getAdjacentLocations(loc) {
-  const parts = parseLocation(loc);
-  if (!parts) return { up: null, down: null, left: null, right: null };
-
-  const { aisle, bay, shelf } = parts;
-  const wh = WAREHOUSES.find(w => w.name === activeWarehouseName) || WAREHOUSES[0];
-  const locs = new Set(wh.locations);
-
-  const up    = locs.has(formatLocation(aisle, bay, shelf + 1))  ? formatLocation(aisle, bay, shelf + 1)  : null;
-  const down  = locs.has(formatLocation(aisle, bay, shelf - 1))  ? formatLocation(aisle, bay, shelf - 1)  : null;
-  const right = locs.has(formatLocation(aisle, bay + 1, shelf))  ? formatLocation(aisle, bay + 1, shelf)  : null;
-  const left  = locs.has(formatLocation(aisle, bay - 1, shelf))  ? formatLocation(aisle, bay - 1, shelf)  : null;
-
-  return { up, down, left, right };
-}
-
-function renderNavArrows(containerId, currentLoc, onNavigate) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  const adj = getAdjacentLocations(currentLoc);
-  if (!adj.up && !adj.down && !adj.left && !adj.right) {
-    container.innerHTML = '';
-    return;
-  }
-  container.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:6px;max-width:180px;margin:8px auto 0;">
-      <div></div>
-      <button onclick="${onNavigate}('${adj.up || ''}')" ${!adj.up ? 'disabled style="visibility:hidden"' : `style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;"`}>↑</button>
-      <div></div>
-      <button onclick="${onNavigate}('${adj.left || ''}')" ${!adj.left ? 'disabled style="visibility:hidden"' : `style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;"`}>←</button>
-      <div style="display:flex;align-items:center;justify-content:center;font-size:11px;color:#888;font-weight:600;">${currentLoc}</div>
-      <button onclick="${onNavigate}('${adj.right || ''}')" ${!adj.right ? 'disabled style="visibility:hidden"' : `style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;"`}>→</button>
-      <div></div>
-      <button onclick="${onNavigate}('${adj.down || ''}')" ${!adj.down ? 'disabled style="visibility:hidden"' : `style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;"`}>↓</button>
-      <div></div>
-    </div>`;
-}
-
-// ============================================================
-// EMPTY LOCATION CHECK
-// ============================================================
-let _emptyLocations = [];
-let _emptyCheckIdx  = 0;
-let _emptyConfirmed = 0;
-let _emptySkipped   = 0;
-
-async function startEmptyLocationCheck() {
-  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
-  toast('Loading live warehouse…', '');
-  try {
-    const all = await getListItems(CONFIG.listLiveWarehouse);
-    const occupied = new Set(all.filter(e => e.Warehouse === wh.name).map(e => e.LocationCode));
-    _emptyLocations = wh.locations.filter(l => !occupied.has(l));
-    _emptyCheckIdx  = 0;
-    _emptyConfirmed = 0;
-    _emptySkipped   = 0;
-
-    if (!_emptyLocations.length) {
-      toast('No empty locations found — all locations have stock!', 'success');
-      return;
-    }
-    showEmptyCheckModal();
-  } catch(err) {
-    toast('Error: ' + err.message, 'error');
-  }
-}
-
-function showEmptyCheckModal() {
-  if (_emptyCheckIdx >= _emptyLocations.length) {
-    closeEmptyCheck();
-    toast(`Done! ${_emptyConfirmed} confirmed empty · ${_emptySkipped} skipped`, 'success');
-    return;
-  }
-  const loc   = _emptyLocations[_emptyCheckIdx];
-  const total = _emptyLocations.length;
-  const pct   = Math.round((_emptyCheckIdx / total) * 100);
-
-  document.getElementById('empty-check-location').textContent = loc;
-  document.getElementById('empty-check-progress').textContent =
-    `${_emptyCheckIdx + 1} of ${total} empty locations · ${_emptyConfirmed} confirmed · ${_emptySkipped} skipped`;
-  document.getElementById('empty-check-status').textContent = '';
-  document.getElementById('empty-check-bar').style.width = pct + '%';
-  document.getElementById('empty-check-modal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-
-function confirmEmptyLocation() {
-  const loc = _emptyLocations[_emptyCheckIdx];
-  document.getElementById('empty-check-status').textContent = '✓ Confirmed';
-  _emptyConfirmed++;
-  _emptyCheckIdx++;
-  setTimeout(showEmptyCheckModal, 300);
-}
-
-function skipEmptyLocation() {
-  _emptySkipped++;
-  _emptyCheckIdx++;
-  showEmptyCheckModal();
-}
-
-function closeEmptyCheck() {
-  document.getElementById('empty-check-modal').style.display = 'none';
-  document.body.style.overflow = '';
 }
 
 // ============================================================
@@ -2607,6 +2487,149 @@ function getBatchValue(inputId) {
 }
 
 // ============================================================
+// LOCATION NAVIGATION
+// ============================================================
+function parseLocation(loc) {
+  const m = loc.match(/^([A-Za-z]+)-(\d+)-(\d+)$/);
+  if (!m) return null;
+  return { aisle: m[1].toUpperCase(), bay: parseInt(m[2]), shelf: parseInt(m[3]) };
+}
+
+function formatLocation(aisle, bay, shelf) {
+  return aisle + '-' + String(bay).padStart(2,'0') + '-' + String(shelf).padStart(2,'0');
+}
+
+function getAdjacentLocations(loc) {
+  const parts = parseLocation(loc);
+  if (!parts) return { up: null, down: null, left: null, right: null };
+  const { aisle, bay, shelf } = parts;
+  const wh = WAREHOUSES.find(w => w.name === activeWarehouseName) || WAREHOUSES[0];
+  const locs = new Set(wh.locations);
+  return {
+    up:    locs.has(formatLocation(aisle, bay, shelf + 1)) ? formatLocation(aisle, bay, shelf + 1) : null,
+    down:  locs.has(formatLocation(aisle, bay, shelf - 1)) ? formatLocation(aisle, bay, shelf - 1) : null,
+    right: locs.has(formatLocation(aisle, bay + 1, shelf)) ? formatLocation(aisle, bay + 1, shelf) : null,
+    left:  locs.has(formatLocation(aisle, bay - 1, shelf)) ? formatLocation(aisle, bay - 1, shelf) : null,
+  };
+}
+
+function renderNavArrows(containerId, currentLoc, onNavigateFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const adj = getAdjacentLocations(currentLoc);
+  if (!adj.up && !adj.down && !adj.left && !adj.right) { container.innerHTML = ''; return; }
+
+  function navBtn(loc, label) {
+    if (!loc) return '<div style="width:40px;height:40px;"></div>';
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;';
+    b.addEventListener('click', () => window[onNavigateFn](loc));
+    return b;
+  }
+
+  container.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0;';
+
+  const rowTop = document.createElement('div');
+  const mid    = document.createElement('div');
+  const rowBot = document.createElement('div');
+  mid.style.cssText = 'display:flex;align-items:center;gap:4px;';
+
+  const centre = document.createElement('div');
+  centre.style.cssText = 'width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;font-weight:600;text-align:center;line-height:1.2;';
+  centre.textContent = currentLoc;
+
+  if (adj.up instanceof Element || typeof adj.up === 'string') rowTop.appendChild(typeof navBtn('x','') === 'string' ? Object.assign(document.createElement('div'), {}) : document.createElement('div'));
+
+  // Build using DOM to avoid any string quoting issues
+  const upEl    = adj.up    ? (() => { const b = document.createElement('button'); b.textContent = '↑'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.up));    return b; })() : document.createElement('div');
+  const downEl  = adj.down  ? (() => { const b = document.createElement('button'); b.textContent = '↓'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.down));  return b; })() : document.createElement('div');
+  const leftEl  = adj.left  ? (() => { const b = document.createElement('button'); b.textContent = '←'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.left));  return b; })() : document.createElement('div');
+  const rightEl = adj.right ? (() => { const b = document.createElement('button'); b.textContent = '→'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.right)); return b; })() : document.createElement('div');
+
+  upEl.style.minWidth = '40px'; upEl.style.minHeight = '40px';
+  downEl.style.minWidth = '40px'; downEl.style.minHeight = '40px';
+  leftEl.style.minWidth = '40px'; leftEl.style.minHeight = '40px';
+  rightEl.style.minWidth = '40px'; rightEl.style.minHeight = '40px';
+
+  rowTop.appendChild(upEl);
+  mid.appendChild(leftEl);
+  mid.appendChild(centre);
+  mid.appendChild(rightEl);
+  rowBot.appendChild(downEl);
+
+  wrap.appendChild(rowTop);
+  wrap.appendChild(mid);
+  wrap.appendChild(rowBot);
+  container.appendChild(wrap);
+}
+
+// ============================================================
+// EMPTY LOCATION CHECK
+// ============================================================
+let _emptyLocations = [];
+let _emptyCheckIdx  = 0;
+let _emptyConfirmed = 0;
+let _emptySkipped   = 0;
+
+async function startEmptyLocationCheck() {
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
+  toast('Loading live warehouse…', '');
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    const occupied = new Set(all.filter(e => e.Warehouse === wh.name).map(e => e.LocationCode));
+    _emptyLocations = wh.locations.filter(l => !occupied.has(l));
+    _emptyCheckIdx  = 0;
+    _emptyConfirmed = 0;
+    _emptySkipped   = 0;
+    if (!_emptyLocations.length) {
+      toast('No empty locations — all locations have stock!', 'success');
+      return;
+    }
+    showEmptyCheckModal();
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+  }
+}
+
+function showEmptyCheckModal() {
+  if (_emptyCheckIdx >= _emptyLocations.length) {
+    closeEmptyCheck();
+    toast('Done! ' + _emptyConfirmed + ' confirmed empty · ' + _emptySkipped + ' skipped', 'success');
+    return;
+  }
+  const loc   = _emptyLocations[_emptyCheckIdx];
+  const total = _emptyLocations.length;
+  document.getElementById('empty-check-location').textContent = loc;
+  document.getElementById('empty-check-progress').textContent =
+    (_emptyCheckIdx + 1) + ' of ' + total + ' empty locations · ' + _emptyConfirmed + ' confirmed · ' + _emptySkipped + ' skipped';
+  document.getElementById('empty-check-status').textContent = '';
+  document.getElementById('empty-check-bar').style.width = Math.round((_emptyCheckIdx / total) * 100) + '%';
+  document.getElementById('empty-check-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function confirmEmptyLocation() {
+  _emptyConfirmed++;
+  _emptyCheckIdx++;
+  document.getElementById('empty-check-status').textContent = '✓ Confirmed';
+  setTimeout(showEmptyCheckModal, 300);
+}
+
+function skipEmptyLocation() {
+  _emptySkipped++;
+  _emptyCheckIdx++;
+  showEmptyCheckModal();
+}
+
+function closeEmptyCheck() {
+  document.getElementById('empty-check-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ============================================================
 // CHANGELOG
 // ============================================================
 async function logChange(action, productCode, batch, warehouse, fromLoc, toLoc, qtyBefore, qtyAfter) {
@@ -3102,7 +3125,6 @@ function selectLocation(code) {
   document.getElementById('location-input').value = code;
   document.getElementById('location-dropdown').style.display = 'none';
   document.getElementById('current-location-display').textContent = code;
-  renderNavArrows('st-nav-arrows', code, 'selectLocation');
 
   // Filter entries for this location
   locationEntries = allEntries.filter(e => e.LocationCode === code);
@@ -3359,7 +3381,7 @@ async function saveEntry(productCode, productDesc, qty, batch = '') {
       field_3:   productCode,            // ProductCode
       field_4:   productDesc || '',      // ProductDescription
       field_5:   qty,                    // CountQty
-      field_6:   batch || ''             // BatchCode
+      BatchCode: batch || ''             // BatchCode
     });
 
     // Push with friendly names so the rest of the app works
@@ -3371,7 +3393,7 @@ async function saveEntry(productCode, productDesc, qty, batch = '') {
       ProductCode: productCode,
       ProductDescription: productDesc || '',
       CountQty: qty,
-      field_6:   batch || ''
+      BatchCode: batch || ''
     });
     locationEntries = allEntries.filter(e => e.LocationCode === currentLocation);
     renderLocationEntries();
@@ -3645,7 +3667,7 @@ async function pushToLiveWarehouse(warehouseName, entries) {
     }
   }
   if (failed > 0) {
-    toast(`⚠️ \${failed} entries failed to write — please check the live warehouse`, 'error');
+    toast(`⚠️ ${failed} entries failed to write — please check the live warehouse`, 'error');
   }
   // Log a single 'StockTake' event for the completion
   logChange('StockTake', '—', '', warehouseName, null, null, null, entries.length);
