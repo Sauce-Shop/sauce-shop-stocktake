@@ -1013,7 +1013,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.25";
+const APP_VERSION = "2.5.26";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2519,50 +2519,63 @@ function renderNavArrows(containerId, currentLoc, onNavigateFn) {
   const adj = getAdjacentLocations(currentLoc);
   if (!adj.up && !adj.down && !adj.left && !adj.right) { container.innerHTML = ''; return; }
 
-  function navBtn(loc, label) {
-    if (!loc) return '<div style="width:40px;height:40px;"></div>';
+  function makeBtn(loc, label) {
     const b = document.createElement('button');
+    b.style.cssText = [
+      'width:36px;height:36px',
+      'border:none',
+      'border-radius:8px',
+      'background:var(--brand)',
+      'color:white',
+      'font-size:15px',
+      'font-weight:700',
+      'cursor:pointer',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'opacity:0.85',
+      'transition:opacity 0.15s',
+    ].join(';');
     b.textContent = label;
-    b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;';
+    b.onmouseover = () => b.style.opacity = '1';
+    b.onmouseout  = () => b.style.opacity = '0.85';
     b.addEventListener('click', () => window[onNavigateFn](loc));
     return b;
   }
 
+  function placeholder() {
+    const d = document.createElement('div');
+    d.style.cssText = 'width:36px;height:36px;';
+    return d;
+  }
+
   container.innerHTML = '';
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0;';
+  wrap.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;gap:4px;background:#fdf3f0;border-radius:10px;padding:8px 12px;margin:4px 0;';
 
   const rowTop = document.createElement('div');
-  const mid    = document.createElement('div');
+  rowTop.style.cssText = 'display:flex;justify-content:center;';
+
+  const rowMid = document.createElement('div');
+  rowMid.style.cssText = 'display:flex;align-items:center;gap:4px;';
+
   const rowBot = document.createElement('div');
-  mid.style.cssText = 'display:flex;align-items:center;gap:4px;';
+  rowBot.style.cssText = 'display:flex;justify-content:center;';
 
   const centre = document.createElement('div');
-  centre.style.cssText = 'width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;font-weight:600;text-align:center;line-height:1.2;';
+  centre.style.cssText = 'width:64px;text-align:center;font-size:11px;font-weight:700;color:var(--brand);letter-spacing:-0.3px;';
   centre.textContent = currentLoc;
 
-  if (adj.up instanceof Element || typeof adj.up === 'string') rowTop.appendChild(typeof navBtn('x','') === 'string' ? Object.assign(document.createElement('div'), {}) : document.createElement('div'));
-
-  // Build using DOM to avoid any string quoting issues
-  const upEl    = adj.up    ? (() => { const b = document.createElement('button'); b.textContent = '↑'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.up));    return b; })() : document.createElement('div');
-  const downEl  = adj.down  ? (() => { const b = document.createElement('button'); b.textContent = '↓'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.down));  return b; })() : document.createElement('div');
-  const leftEl  = adj.left  ? (() => { const b = document.createElement('button'); b.textContent = '←'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.left));  return b; })() : document.createElement('div');
-  const rightEl = adj.right ? (() => { const b = document.createElement('button'); b.textContent = '→'; b.style.cssText = 'background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:16px;width:40px;height:40px;'; b.addEventListener('click', () => window[onNavigateFn](adj.right)); return b; })() : document.createElement('div');
-
-  upEl.style.minWidth = '40px'; upEl.style.minHeight = '40px';
-  downEl.style.minWidth = '40px'; downEl.style.minHeight = '40px';
-  leftEl.style.minWidth = '40px'; leftEl.style.minHeight = '40px';
-  rightEl.style.minWidth = '40px'; rightEl.style.minHeight = '40px';
-
-  rowTop.appendChild(upEl);
-  mid.appendChild(leftEl);
-  mid.appendChild(centre);
-  mid.appendChild(rightEl);
-  rowBot.appendChild(downEl);
+  rowTop.appendChild(adj.up   ? makeBtn(adj.up,   '↑') : placeholder());
+  rowMid.appendChild(adj.left ? makeBtn(adj.left,  '←') : placeholder());
+  rowMid.appendChild(centre);
+  rowMid.appendChild(adj.right ? makeBtn(adj.right, '→') : placeholder());
+  rowBot.appendChild(adj.down  ? makeBtn(adj.down,  '↓') : placeholder());
 
   wrap.appendChild(rowTop);
-  wrap.appendChild(mid);
+  wrap.appendChild(rowMid);
   wrap.appendChild(rowBot);
+  container.style.cssText = 'padding:4px 16px 4px;';
   container.appendChild(wrap);
 }
 
