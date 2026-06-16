@@ -375,7 +375,6 @@
     <!-- VIEW: LIVE WAREHOUSE COUNT -->
     <div id="view-livecount" class="view">
       <div class="card" id="livecount-info-bar"><!-- filled dynamically --></div>
-      <div id="lc-nav-arrows" style="padding:2px 16px 8px;"></div>
       <div id="livecount-product-loading" style="display:none;background:#fff8f6;border:1px solid #ffd0c0;border-radius:8px;padding:10px 14px;font-size:13px;color:#e8401c;margin-bottom:4px;">
         ⏳ Loading product list…
       </div>
@@ -397,11 +396,12 @@
       <!-- Location contents -->
       <div id="lc-location-panel" style="display:none">
         <div class="card">
-          <div class="location-header">
+          <div class="location-header" style="align-items:center;">
             <div>
               <div class="location-code" id="lc-current-location-display"></div>
               <div class="location-meta" id="lc-location-entry-count"></div>
             </div>
+            <div id="lc-nav-arrows" style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;padding:0 8px;"></div>
             <button class="btn btn-sm btn-secondary" onclick="clearLcLocation()">Change</button>
           </div>
           <div id="lc-location-entries"></div>
@@ -1013,7 +1013,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.26";
+const APP_VERSION = "2.5.27";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2517,66 +2517,25 @@ function renderNavArrows(containerId, currentLoc, onNavigateFn) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const adj = getAdjacentLocations(currentLoc);
-  if (!adj.up && !adj.down && !adj.left && !adj.right) { container.innerHTML = ''; return; }
 
   function makeBtn(loc, label) {
     const b = document.createElement('button');
-    b.style.cssText = [
-      'width:36px;height:36px',
-      'border:none',
-      'border-radius:8px',
-      'background:var(--brand)',
-      'color:white',
-      'font-size:15px',
-      'font-weight:700',
-      'cursor:pointer',
-      'display:flex',
-      'align-items:center',
-      'justify-content:center',
-      'opacity:0.85',
-      'transition:opacity 0.15s',
-    ].join(';');
+    b.style.cssText = 'width:32px;height:32px;border:none;border-radius:7px;background:var(--brand);color:white;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.8;flex-shrink:0;';
     b.textContent = label;
     b.onmouseover = () => b.style.opacity = '1';
-    b.onmouseout  = () => b.style.opacity = '0.85';
+    b.onmouseout  = () => b.style.opacity = '0.8';
     b.addEventListener('click', () => window[onNavigateFn](loc));
     return b;
   }
 
-  function placeholder() {
-    const d = document.createElement('div');
-    d.style.cssText = 'width:36px;height:36px;';
-    return d;
-  }
-
   container.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;gap:4px;background:#fdf3f0;border-radius:10px;padding:8px 12px;margin:4px 0;';
+  if (!adj.up && !adj.down && !adj.left && !adj.right) return;
 
-  const rowTop = document.createElement('div');
-  rowTop.style.cssText = 'display:flex;justify-content:center;';
-
-  const rowMid = document.createElement('div');
-  rowMid.style.cssText = 'display:flex;align-items:center;gap:4px;';
-
-  const rowBot = document.createElement('div');
-  rowBot.style.cssText = 'display:flex;justify-content:center;';
-
-  const centre = document.createElement('div');
-  centre.style.cssText = 'width:64px;text-align:center;font-size:11px;font-weight:700;color:var(--brand);letter-spacing:-0.3px;';
-  centre.textContent = currentLoc;
-
-  rowTop.appendChild(adj.up   ? makeBtn(adj.up,   '↑') : placeholder());
-  rowMid.appendChild(adj.left ? makeBtn(adj.left,  '←') : placeholder());
-  rowMid.appendChild(centre);
-  rowMid.appendChild(adj.right ? makeBtn(adj.right, '→') : placeholder());
-  rowBot.appendChild(adj.down  ? makeBtn(adj.down,  '↓') : placeholder());
-
-  wrap.appendChild(rowTop);
-  wrap.appendChild(rowMid);
-  wrap.appendChild(rowBot);
-  container.style.cssText = 'padding:4px 16px 4px;';
-  container.appendChild(wrap);
+  // Inline layout: ← ↓ ↑ → (left, down, up, right — matches physical racking)
+  if (adj.left)  container.appendChild(makeBtn(adj.left,  '←'));
+  if (adj.down)  container.appendChild(makeBtn(adj.down,  '↓'));
+  if (adj.up)    container.appendChild(makeBtn(adj.up,    '↑'));
+  if (adj.right) container.appendChild(makeBtn(adj.right, '→'));
 }
 
 // ============================================================
