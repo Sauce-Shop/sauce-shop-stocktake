@@ -497,6 +497,10 @@
           <label>Changelog List Name</label>
           <input type="text" id="sp-list-changelog" placeholder="LiveWarehouseChangelog" value="LiveWarehouseChangelog">
         </div>
+        <div class="form-group">
+          <label>Operators List Name</label>
+          <input type="text" id="sp-list-operators" placeholder="Operators" value="Operators">
+        </div>
 
         <div class="form-group">
           <label>Azure App Client ID</label>
@@ -1025,7 +1029,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.29";
+const APP_VERSION = "2.5.30";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1059,6 +1063,7 @@ let CONFIG = {
   listProducts: 'Products',
   listLiveWarehouse: 'LiveWarehouse',
   listChangelog: 'LiveWarehouseChangelog',
+  listOperators: 'Operators',
   listUnleashedStock: 'DevUnleashedStock',
   clientId: '',
   tenantId: ''
@@ -1079,6 +1084,7 @@ function saveSettings() {
   CONFIG.listProducts      = get('sp-list-products')      || 'Products';
   CONFIG.listLiveWarehouse = get('sp-list-livewarehouse') || 'LiveWarehouse';
   CONFIG.listChangelog     = get('sp-list-changelog')     || 'LiveWarehouseChangelog';
+  CONFIG.listOperators    = get('sp-list-operators')    || 'Operators';
   localStorage.setItem('ss_stocktake_config', JSON.stringify(CONFIG));
   const missing = [];
   if (!CONFIG.clientId) missing.push('Client ID');
@@ -1111,6 +1117,7 @@ function loadSettingsUI() {
   set('sp-list-products',     CONFIG.listProducts || 'Products');
   set('sp-list-livewarehouse', CONFIG.listLiveWarehouse || 'LiveWarehouse');
   set('sp-list-changelog',    CONFIG.listChangelog || 'LiveWarehouseChangelog');
+  set('sp-list-operators',    CONFIG.listOperators  || 'Operators');
 }
 
 // ============================================================
@@ -1119,7 +1126,7 @@ function loadSettingsUI() {
 let msalInstance = null;
 let currentAccount = null;
 let currentOperator = null;
-const OPERATORS = ['Tom', 'Niall', 'John', 'Reece', 'Nathan', 'Oliver', 'Kyle'];
+let OPERATORS = []; // loaded from SharePoint Operators list
 let accessToken = null;
 
 function initMsal() {
@@ -1205,7 +1212,7 @@ function onSignedIn() {
   showView('home');
   renderWarehouseTabs();
   loadStockTakes();
-  showOperatorModal(true);
+  loadOperators().then(() => showOperatorModal());
   loadLiveWarehouseMeta();
 }
 
@@ -1379,6 +1386,16 @@ function showView(name) {
 // ============================================================
 // OPERATOR SELECTION
 // ============================================================
+async function loadOperators() {
+  try {
+    const items = await getListItems(CONFIG.listOperators);
+    OPERATORS = items.map(i => i.Title || i.code || '').filter(Boolean).sort();
+  } catch(e) {
+    console.warn('Could not load operators:', e.message);
+    OPERATORS = ['Tom', 'Niall', 'John', 'Reece', 'Nathan', 'Oliver', 'Kyle']; // fallback
+  }
+}
+
 function showOperatorModal() {
   const list = document.getElementById('operator-list');
   list.innerHTML = '';
