@@ -1011,6 +1011,30 @@
   </div>
 </div>
 
+<!-- UPLOAD PROGRESS OVERLAY -->
+<div id="upload-progress-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:white;border-radius:16px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <div style="background:var(--brand);color:white;padding:20px 24px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+      <div style="font-weight:800;font-size:18px;">Writing to Live Warehouse</div>
+      <div style="font-size:13px;opacity:0.85;margin-top:4px;">Please do not leave this screen</div>
+    </div>
+    <div style="padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+        <div id="upload-progress-text" style="font-size:15px;font-weight:700;color:var(--text);"></div>
+        <div id="upload-progress-pct" style="font-size:22px;font-weight:800;color:var(--brand);"></div>
+      </div>
+      <div style="background:#f0f0f0;border-radius:99px;height:16px;overflow:hidden;margin-bottom:12px;">
+        <div id="upload-progress-bar" style="height:100%;background:var(--brand);border-radius:99px;width:0%;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="font-size:12px;color:#888;text-align:center;padding:10px;background:#fff8f6;border-radius:8px;border:1px solid #ffd0c0;">
+        ⚠️ Do not close the app, navigate away, or lock your screen until this completes
+      </div>
+      <div id="upload-progress-failed" style="display:none;margin-top:10px;font-size:12px;color:#c62828;text-align:center;font-weight:600;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- SCANNER OVERLAY -->
 <div id="scanner-overlay">
   <div id="scanner-container">
@@ -1029,7 +1053,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.30";
+const APP_VERSION = "2.5.32";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1234,7 +1258,7 @@ async function trySilentSignIn() {
 // ============================================================
 // SHAREPOINT API
 // ============================================================
-async function spFetch(path, options = {}, retries = 4) {
+async function spFetch(path, options = {}, retries = 6) {
   const token = await getToken();
   const siteId = await getSiteId();
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}${path}`;
@@ -2555,6 +2579,36 @@ function getBatchValue(inputId) {
 }
 
 // ============================================================
+// UPLOAD PROGRESS OVERLAY
+// ============================================================
+function showUploadProgress(total) {
+  const overlay = document.getElementById('upload-progress-overlay');
+  document.getElementById('upload-progress-bar').style.width = '0%';
+  document.getElementById('upload-progress-pct').textContent = '0%';
+  document.getElementById('upload-progress-text').textContent = '0 / ' + total + ' entries';
+  document.getElementById('upload-progress-failed').style.display = 'none';
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function updateUploadProgress(written, total, failed) {
+  const pct = Math.round((written / total) * 100);
+  document.getElementById('upload-progress-bar').style.width = pct + '%';
+  document.getElementById('upload-progress-pct').textContent = pct + '%';
+  document.getElementById('upload-progress-text').textContent = written + ' / ' + total + ' entries';
+  if (failed) {
+    const el = document.getElementById('upload-progress-failed');
+    el.style.display = 'block';
+    el.textContent = '⚠️ ' + failed + ' entries failed to write';
+  }
+}
+
+function hideUploadProgress() {
+  document.getElementById('upload-progress-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ============================================================
 // LOCATION NAVIGATION
 // ============================================================
 function parseLocation(loc) {
@@ -3675,17 +3729,17 @@ async function pushToLiveWarehouse(warehouseName, entries) {
   const toDelete = existing.filter(e => e.Warehouse === warehouseName);
   toast(`Clearing ${toDelete.length} existing entries…`, '');
   for (const e of toDelete) {
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 250));
     await deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {});
   }
 
   // Write new entries sequentially to avoid SharePoint throttling
-  toast(`Writing ${entries.length} entries to Live Warehouse…`, '');
+  showUploadProgress(entries.length);
   let written = 0;
   let failed = 0;
   for (const e of entries) {
-    // Throttle: wait 200ms between writes to avoid SharePoint rate limits
-    await new Promise(r => setTimeout(r, 200));
+    // Throttle: wait 500ms between writes to avoid SharePoint rate limits
+    await new Promise(r => setTimeout(r, 500));
     try {
       await createListItem(CONFIG.listLiveWarehouse, {
         Title:   e.ProductCode,
@@ -3703,11 +3757,14 @@ async function pushToLiveWarehouse(warehouseName, entries) {
     }
     written++;
     if (written % 5 === 0 || written === entries.length) {
-      toast('Writing Live Warehouse… ' + written + '/' + entries.length + (failed ? ' (' + failed + ' failed)' : ''), '');
+      updateUploadProgress(written, entries.length, failed);
     }
   }
+  hideUploadProgress();
   if (failed > 0) {
-    toast(`⚠️ ${failed} entries failed to write — please check the live warehouse`, 'error');
+    toast('⚠️ ' + failed + ' entries failed to write — please check the live warehouse', 'error');
+  } else {
+    toast('✓ All ' + entries.length + ' entries written successfully', 'success');
   }
   // Log a single 'StockTake' event for the completion
   logChange('StockTake', '—', '', warehouseName, null, null, null, entries.length);
