@@ -1053,7 +1053,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.32";
+const APP_VERSION = "2.5.34";
 
 // ============================================================
 // EMBEDDED DATA
@@ -3733,12 +3733,11 @@ async function pushToLiveWarehouse(warehouseName, entries) {
     await deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {});
   }
 
-  // Write new entries sequentially to avoid SharePoint throttling
+  // ── First pass: write all entries sequentially ─────────────────────────────
   showUploadProgress(entries.length);
   let written = 0;
   let failed = 0;
   for (const e of entries) {
-    // Throttle: wait 500ms between writes to avoid SharePoint rate limits
     await new Promise(r => setTimeout(r, 500));
     try {
       await createListItem(CONFIG.listLiveWarehouse, {
@@ -3760,11 +3759,74 @@ async function pushToLiveWarehouse(warehouseName, entries) {
       updateUploadProgress(written, entries.length, failed);
     }
   }
-  hideUploadProgress();
-  if (failed > 0) {
-    toast('⚠️ ' + failed + ' entries failed to write — please check the live warehouse', 'error');
-  } else {
-    toast('✓ All ' + entries.length + ' entries written successfully', 'success');
+
+  // ── Verification loop: keep retrying until everything matches ──────────────
+  try {
+    let toWrite = entries;
+    let attempt = 0;
+    const maxAttempts = 10;
+    let totalRetried = 0;
+
+    while (attempt < maxAttempts) {
+      attempt++;
+      document.getElementById('upload-progress-text').textContent =
+        attempt === 1 ? 'Verifying…' : 'Verifying (attempt ' + attempt + ')…';
+      document.getElementById('upload-progress-pct').textContent = '✓?';
+      await new Promise(r => setTimeout(r, 2000));
+
+      const current = await getListItems(CONFIG.listLiveWarehouse);
+      const inLW = new Set(
+        current
+          .filter(e => e.Warehouse === warehouseName)
+          .map(e => e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
+      );
+
+      const missing = toWrite.filter(e =>
+        !inLW.has(e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
+      );
+
+      if (missing.length === 0) {
+        const msg = totalRetried > 0
+          ? '✓ All ' + entries.length + ' entries verified (' + totalRetried + ' retried across ' + (attempt - 1) + ' passes)'
+          : '✓ All ' + entries.length + ' entries verified successfully';
+        toast(msg, 'success');
+        break;
+      }
+
+      console.warn('Attempt ' + attempt + ': ' + missing.length + ' entries still missing — retrying');
+      document.getElementById('upload-progress-text').textContent =
+        'Pass ' + attempt + ': retrying ' + missing.length + ' missing entries…';
+      document.getElementById('upload-progress-pct').textContent = '↻';
+
+      for (const e of missing) {
+        await new Promise(r => setTimeout(r, 800));
+        try {
+          await createListItem(CONFIG.listLiveWarehouse, {
+            Title:   e.ProductCode,
+            field_1: e.LocationCode,
+            field_2: e.ProductDescription || '',
+            field_3: e.CountQty,
+            field_4: e.BatchCode || '',
+            field_5: warehouseName,
+            field_6: now,
+            field_7: updatedBy
+          });
+          totalRetried++;
+        } catch(err) {
+          console.error('LW retry error (attempt ' + attempt + '):', err);
+        }
+      }
+
+      toWrite = missing;
+    }
+
+    if (attempt >= maxAttempts) {
+      toast('⚠️ Could not verify all entries after ' + maxAttempts + ' attempts — please check the live warehouse', 'error');
+    }
+
+  } catch(verifyErr) {
+    console.error('Verification error:', verifyErr);
+    toast('✓ Written — verification check failed; entries may be correct', 'success');
   }
   // Log a single 'StockTake' event for the completion
   logChange('StockTake', '—', '', warehouseName, null, null, null, entries.length);
