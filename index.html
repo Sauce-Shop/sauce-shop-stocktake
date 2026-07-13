@@ -1053,7 +1053,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.35";
+const APP_VERSION = "2.5.36";
 
 // ============================================================
 // EMBEDDED DATA
@@ -3780,6 +3780,7 @@ async function pushToLiveWarehouse(warehouseName, entries) {
           .filter(e => e.Warehouse === warehouseName)
           .map(e => e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
       );
+      // Also verify zero-qty entries — they have a key too
 
       const missing = toWrite.filter(e =>
         !inLW.has(e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
