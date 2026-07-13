@@ -1053,7 +1053,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.36";
+const APP_VERSION = "2.5.38";
 
 // ============================================================
 // EMBEDDED DATA
@@ -3727,10 +3727,20 @@ async function pushToLiveWarehouse(warehouseName, entries) {
   // Delete all existing for this warehouse in batches
   const existing = await getListItems(CONFIG.listLiveWarehouse);
   const toDelete = existing.filter(e => e.Warehouse === warehouseName);
-  toast(`Clearing ${toDelete.length} existing entries…`, '');
+
+  // Show delete progress on the overlay
+  document.getElementById('upload-progress-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('upload-progress-failed').style.display = 'none';
+
+  let deleted = 0;
   for (const e of toDelete) {
+    document.getElementById('upload-progress-text').textContent = 'Clearing ' + deleted + ' / ' + toDelete.length + ' existing entries…';
+    document.getElementById('upload-progress-pct').textContent = Math.round((deleted / Math.max(toDelete.length, 1)) * 100) + '%';
+    document.getElementById('upload-progress-bar').style.width = Math.round((deleted / Math.max(toDelete.length, 1)) * 100) + '%';
     await new Promise(r => setTimeout(r, 250));
     await deleteListItem(CONFIG.listLiveWarehouse, e.id).catch(() => {});
+    deleted++;
   }
 
   // ── First pass: write all entries sequentially ─────────────────────────────
@@ -3767,11 +3777,16 @@ async function pushToLiveWarehouse(warehouseName, entries) {
     const maxAttempts = 10;
     let totalRetried = 0;
 
+    // Switch overlay to verification mode
+    document.getElementById('upload-progress-bar').style.width = '0%';
+    document.getElementById('upload-progress-pct').textContent = '';
+
     while (attempt < maxAttempts) {
       attempt++;
-      document.getElementById('upload-progress-text').textContent =
-        attempt === 1 ? 'Verifying…' : 'Verifying (attempt ' + attempt + ')…';
-      document.getElementById('upload-progress-pct').textContent = '✓?';
+      const attemptLabel = attempt === 1 ? 'Verifying…' : 'Re-verifying (pass ' + attempt + ')…';
+      document.getElementById('upload-progress-text').textContent = attemptLabel;
+      document.getElementById('upload-progress-pct').textContent = '⏳';
+      document.getElementById('upload-progress-bar').style.width = '0%';
       await new Promise(r => setTimeout(r, 2000));
 
       const current = await getListItems(CONFIG.listLiveWarehouse);
@@ -3780,26 +3795,47 @@ async function pushToLiveWarehouse(warehouseName, entries) {
           .filter(e => e.Warehouse === warehouseName)
           .map(e => e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
       );
-      // Also verify zero-qty entries — they have a key too
 
+      const total   = entries.length;
       const missing = toWrite.filter(e =>
         !inLW.has(e.ProductCode + '|' + (e.LocationCode||'') + '|' + (e.BatchCode||''))
       );
+      const confirmed = total - missing.length;
+      const pct = Math.round((confirmed / total) * 100);
+
+      // Live count update
+      document.getElementById('upload-progress-text').textContent =
+        'Confirmed ' + confirmed + ' / ' + total + (missing.length > 0 ? ' · ' + missing.length + ' missing' : '');
+      document.getElementById('upload-progress-pct').textContent = pct + '%';
+      document.getElementById('upload-progress-bar').style.width = pct + '%';
 
       if (missing.length === 0) {
+        // All confirmed — show tick
+        document.getElementById('upload-progress-text').textContent =
+          '✓ All ' + total + ' entries confirmed' + (totalRetried > 0 ? ' (' + totalRetried + ' retried)' : '');
+        document.getElementById('upload-progress-pct').textContent = '✓';
+        document.getElementById('upload-progress-bar').style.width = '100%';
+        document.getElementById('upload-progress-bar').style.background = '#4caf50';
+        await new Promise(r => setTimeout(r, 1200)); // show tick briefly
         const msg = totalRetried > 0
-          ? '✓ All ' + entries.length + ' entries verified (' + totalRetried + ' retried across ' + (attempt - 1) + ' passes)'
-          : '✓ All ' + entries.length + ' entries verified successfully';
+          ? '✓ All ' + total + ' entries verified (' + totalRetried + ' retried across ' + (attempt - 1) + ' passes)'
+          : '✓ All ' + total + ' entries verified successfully';
         toast(msg, 'success');
         break;
       }
 
-      console.warn('Attempt ' + attempt + ': ' + missing.length + ' entries still missing — retrying');
-      document.getElementById('upload-progress-text').textContent =
-        'Pass ' + attempt + ': retrying ' + missing.length + ' missing entries…';
-      document.getElementById('upload-progress-pct').textContent = '↻';
+      // Show missing count and retry
+      if (missing.length > 0) {
+        const failEl = document.getElementById('upload-progress-failed');
+        failEl.style.display = 'block';
+        failEl.textContent = '↻ Retrying ' + missing.length + ' missing entries…';
+      }
 
+      let retryCount = 0;
       for (const e of missing) {
+        retryCount++;
+        document.getElementById('upload-progress-text').textContent =
+          'Retrying ' + retryCount + ' / ' + missing.length + ' missing entries…';
         await new Promise(r => setTimeout(r, 800));
         try {
           await createListItem(CONFIG.listLiveWarehouse, {
@@ -3822,7 +3858,10 @@ async function pushToLiveWarehouse(warehouseName, entries) {
     }
 
     if (attempt >= maxAttempts) {
+      document.getElementById('upload-progress-text').textContent = '⚠️ Could not confirm all entries after ' + maxAttempts + ' attempts';
+      document.getElementById('upload-progress-pct').textContent = '!';
       toast('⚠️ Could not verify all entries after ' + maxAttempts + ' attempts — please check the live warehouse', 'error');
+      await new Promise(r => setTimeout(r, 2000));
     }
 
   } catch(verifyErr) {
