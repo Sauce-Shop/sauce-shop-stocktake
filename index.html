@@ -1053,7 +1053,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.38";
+const APP_VERSION = "2.5.39";
 
 // ============================================================
 // EMBEDDED DATA
@@ -3816,12 +3816,20 @@ async function pushToLiveWarehouse(warehouseName, entries) {
         document.getElementById('upload-progress-pct').textContent = '✓';
         document.getElementById('upload-progress-bar').style.width = '100%';
         document.getElementById('upload-progress-bar').style.background = '#4caf50';
-        await new Promise(r => setTimeout(r, 1200)); // show tick briefly
+        // Show Close button — let user dismiss manually
+        const failEl = document.getElementById('upload-progress-failed');
+        failEl.style.display = 'block';
+        failEl.style.color = '#2e7d32';
+        failEl.style.background = '#f1f8e9';
+        failEl.style.border = '1px solid #a5d6a7';
+        failEl.style.borderRadius = '8px';
+        failEl.style.padding = '10px';
+        failEl.innerHTML = '<button onclick="hideUploadProgress()" style="width:100%;padding:12px;background:#4caf50;color:white;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">✓ Close</button>';
         const msg = totalRetried > 0
           ? '✓ All ' + total + ' entries verified (' + totalRetried + ' retried across ' + (attempt - 1) + ' passes)'
           : '✓ All ' + total + ' entries verified successfully';
         toast(msg, 'success');
-        break;
+        return; // don't fall through to hideUploadProgress
       }
 
       // Show missing count and retry
