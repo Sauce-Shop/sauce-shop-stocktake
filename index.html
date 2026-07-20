@@ -415,6 +415,7 @@
             </div>
             <div id="lc-nav-arrows" style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;padding:0 8px;"></div>
             <button class="btn btn-sm btn-secondary" onclick="clearLcLocation()">Change</button>
+            <button class="btn btn-sm btn-secondary" onclick="exportLcLocation()">Download</button>
           </div>
           <div id="lc-location-entries"></div>
           <div id="lc-no-entries-yet" class="empty" style="display:none">
@@ -584,6 +585,8 @@
           <option value="">— Select warehouse —</option>
           <option value="unit2">Warehouse</option>
           <option value="unit3">Production</option>
+          <option value="scend">Scend</option>
+          <option value="mts">MTS</option>
         </select>
       </div>
       <div style="display:flex;gap:10px;">
@@ -1053,7 +1056,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.39";
+const APP_VERSION = "2.5.42";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1639,6 +1642,23 @@ function selectLcLocation(code) {
   document.getElementById('lc-selected-product-preview').style.display = 'none';
   document.getElementById('lc-add-product-btn').disabled = true;
   renderLcLocationEntries();
+}
+
+function exportLcLocation() {
+  if (!lwLocation || !lwLocationEntries.length) {
+    toast('No entries to export', 'error');
+    return;
+  }
+  const headers = ['ProductCode', 'ProductDescription', 'CountQty', 'BatchCode', 'Location'];
+  const rows = lwLocationEntries.map(e => [
+    csvEscape(e.ProductCode || ''),
+    csvEscape(e.ProductDescription || ''),
+    e.CountQty,
+    csvEscape(e.BatchCode || ''),
+    csvEscape(e.LocationCode || lwLocation)
+  ]);
+  triggerCSVDownload([headers, ...rows], 'location-' + lwLocation + '.csv');
+  toast('Downloaded ' + lwLocationEntries.length + ' entries', 'success');
 }
 
 function clearLcLocation() {
