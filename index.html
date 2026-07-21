@@ -414,7 +414,6 @@
               <div class="location-meta" id="lc-location-entry-count"></div>
             </div>
             <div id="lc-nav-arrows" style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;padding:0 8px;"></div>
-            <button class="btn btn-sm btn-secondary" onclick="clearLcLocation()">Change</button>
             <button class="btn btn-sm btn-secondary" onclick="exportLcLocation()">Download</button>
           </div>
           <div id="lc-location-entries"></div>
@@ -1010,6 +1009,12 @@
         </button>
         <div style="font-size:11px;color:#888;margin-top:5px;padding:0 4px;">Split by product + batch code. Includes descriptions and warehouse.</div>
       </div>
+      <div>
+        <button class="btn btn-secondary btn-full" onclick="downloadLwLocationsCSV()">
+          ⬇ Export Locations
+        </button>
+        <div style="font-size:11px;color:#888;margin-top:5px;padding:0 4px;">Full data including location, product code, description, quantity and batch.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1056,7 +1061,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.42";
+const APP_VERSION = "2.5.44";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1934,6 +1939,27 @@ function showLiveWarehouseExport() {
   // Reuse the export modal but wire it to live warehouse data
   document.getElementById('lw-export-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+}
+
+function downloadLwLocationsCSV() {
+  const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
+  const mine = lwEntries.filter(e => e.Warehouse === wh.name);
+  if (!mine.length) { toast('No data to export', 'error'); return; }
+  const headers = ['LocationCode', 'ProductCode', 'ProductDescription', 'CountQty', 'BatchCode', 'Warehouse'];
+  const rows = mine
+    .sort((a, b) => (a.LocationCode||'').localeCompare(b.LocationCode||'') || (a.ProductCode||'').localeCompare(b.ProductCode||''))
+    .map(e => [
+      csvEscape(e.LocationCode || ''),
+      csvEscape(e.ProductCode || ''),
+      csvEscape(e.ProductDescription || ''),
+      e.CountQty,
+      csvEscape(e.BatchCode || ''),
+      csvEscape(e.Warehouse || '')
+    ]);
+  const date = new Date().toISOString().slice(0, 10);
+  triggerCSVDownload([headers, ...rows], 'lw-locations-' + wh.id + '-' + date + '.csv');
+  toast('Downloaded ' + mine.length + ' entries', 'success');
+  closeLwExportModal();
 }
 
 function closeLwExportModal() {
