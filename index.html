@@ -415,7 +415,7 @@
             </div>
             <div id="lc-nav-arrows" style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;padding:0 8px;"></div>
             <button class="btn btn-sm btn-secondary" onclick="exportLcLocation()">Download</button>
-            <button class="btn btn-sm btn-secondary" onclick="exportMtsAsn()" style="background:#e3f2fd;border-color:#90caf9;color:#1565c0;">MTS ASN</button>
+            <button class="btn btn-sm btn-secondary" onclick="openAsnModal()" style="background:#e3f2fd;border-color:#90caf9;color:#1565c0;">MTS ASN</button>
           </div>
           <div id="lc-location-entries"></div>
           <div id="lc-no-entries-yet" class="empty" style="display:none">
@@ -798,6 +798,27 @@
   </div>
 </div>
 
+<!-- BBE MODAL -->
+<div id="bbe-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:360px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:800;font-size:16px;">📅 Best Before Date</div>
+        <div id="bbe-modal-subtitle" style="font-size:12px;opacity:0.85;margin-top:2px;"></div>
+      </div>
+      <button onclick="closeBbeModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <input type="date" id="bbe-date-input"
+        style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;box-sizing:border-box;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="clearBbe()">Clear</button>
+        <button class="btn btn-primary" style="flex:2" onclick="saveBbe()">✓ Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- SSCC MODAL -->
 <div id="sscc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;align-items:center;justify-content:center;padding:16px;">
   <div style="background:white;border-radius:12px;width:100%;max-width:440px;overflow:hidden;">
@@ -819,6 +840,32 @@
       </div>
       <!-- SSCC list -->
       <div id="sscc-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ASN DETAILS MODAL -->
+<div id="asn-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:380px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:14px 18px;">
+      <div style="font-weight:800;font-size:16px;">⬇ MTS ASN Download</div>
+      <div style="font-size:12px;opacity:0.85;margin-top:2px;">Enter delivery details</div>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:12px;font-weight:700;text-transform:uppercase;color:#888;display:block;margin-bottom:6px;">ASN Number / PO Ref</label>
+        <input type="text" id="asn-number-input" placeholder="e.g. ASN-2026-001"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;text-transform:uppercase;color:#888;display:block;margin-bottom:6px;">Delivery Date</label>
+        <input type="date" id="asn-date-input"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;box-sizing:border-box;">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeAsnModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2" onclick="confirmExportMtsAsn()">⬇ Download</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1087,7 +1134,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.50";
+const APP_VERSION = "2.5.51";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1559,7 +1606,8 @@ function switchWarehouseTab(id) {
 // LIVE WAREHOUSE
 // ============================================================
 let lwEntries = [];
-let ssccData = {}; // key = entryId -> [{sscc, qty}]        // all live warehouse entries for active warehouse
+let ssccData = {}; // key = entryId -> [{sscc, qty}]
+let bbeData  = {}; // key = entryId -> 'DD/MM/YYYY'        // all live warehouse entries for active warehouse
 let liveViewStockTake = null; // stock take currently shown in live view modal (for navigation)
 let liveViewIsLiveWarehouse = false; // whether live view is showing live warehouse
 let lwLocation = null;     // current location in livecount view
@@ -1686,19 +1734,7 @@ function selectLcLocation(code) {
   renderLcLocationEntries();
 }
 
-function exportMtsAsn() {
-  if (!lwLocation || !lwLocationEntries.length) {
-    toast('No entries in this location', 'error');
-    return;
-  }
-
-  // Check all entries have SSCCs
-  const missing = lwLocationEntries.filter(e => !ssccData[e.id] || !ssccData[e.id].length);
-  if (missing.length) {
-    toast('Please add SSCCs to all ' + missing.length + ' entries first', 'error');
-    return;
-  }
-
+function exportMtsAsn(asnNumber, dueDate) {
   const headers = ['po_ref','due_date','line_no','product_code','quantity','pallet_ref','stockowner','batch_number','expiry_date'];
   const rows = [];
   let lineNo = 1;
@@ -1710,18 +1746,19 @@ function exportMtsAsn() {
     const caseCode = (e.ProductCode || '').replace(/\(S\)$/i, '').trim();
     const totalQty = Number(e.CountQty) || 0;
     const qtyPer   = count > 0 ? Math.round((totalQty / count / 6) * 100) / 100 : 0;
+    const expiry   = bbeData[e.id] || '';
 
     ssccList.forEach(s => {
       rows.push([
-        '',           // po_ref
-        '',           // due_date
-        lineNo++,     // line_no
+        csvEscape(asnNumber || ''),
+        csvEscape(dueDate   || ''),
+        lineNo++,
         csvEscape(caseCode),
         qtyPer,
         csvEscape(s.sscc),
-        '',           // stockowner
+        '',
         csvEscape(e.BatchCode || ''),
-        ''            // expiry_date
+        csvEscape(expiry)
       ]);
     });
   });
@@ -1778,6 +1815,7 @@ function renderLcLocationEntries() {
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
           <button class="btn btn-sm btn-secondary" onclick="startMoveEntry('${e.id}')" title="Move to another location">📦 Move</button>
           <button class="btn btn-sm" onclick="openSsccModal('${e.id}')" title="Add SSCC numbers" style="background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;">+ SSCC</button>
+          <button class="btn btn-sm" onclick="openBbeModal('${e.id}')" title="Add Best Before Date" style="background:#fff8e1;border:1px solid #ffe082;color:#f57f17;">+ BBE</button>
           <button class="del-btn" onclick="deleteLcEntry('${e.id}')" title="Remove">✕</button>
         </div>
       </div>
@@ -1792,6 +1830,7 @@ function renderLcLocationEntries() {
         <div style="font-size:12px;color:var(--text-muted);margin-left:4px;">units</div>
       </div>
       <div id="sscc-summary-${e.id}" style="font-size:11px;color:#2e7d32;padding:4px 0 2px;"></div>
+      <div id="bbe-summary-${e.id}" style="font-size:11px;color:#f57f17;padding:0 0 2px;"></div>
     </div>
   `).join('');
   lwLocationEntries.forEach(e => refreshSsccSummary(e.id));
@@ -2852,6 +2891,61 @@ function skipEmptyLocation() {
   _emptySkipped++;
   _emptyCheckIdx++;
   showEmptyCheckModal();
+}
+
+// ============================================================
+// BBE (BEST BEFORE DATE) MANAGEMENT
+// ============================================================
+let _bbeEntryId = null;
+
+function openBbeModal(entryId) {
+  _bbeEntryId = entryId;
+  const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  document.getElementById('bbe-modal-subtitle').textContent =
+    entry.ProductCode + (entry.BatchCode ? ' · Batch: ' + entry.BatchCode : '');
+  // Pre-populate with existing BBE if set
+  const existing = bbeData[entryId];
+  if (existing) {
+    // Convert DD/MM/YYYY to YYYY-MM-DD for the date input
+    const parts = existing.split('/');
+    document.getElementById('bbe-date-input').value = parts[2] + '-' + parts[1] + '-' + parts[0];
+  } else {
+    document.getElementById('bbe-date-input').value = '';
+  }
+  document.getElementById('bbe-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeBbeModal() {
+  document.getElementById('bbe-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  _bbeEntryId = null;
+}
+
+function saveBbe() {
+  const val = document.getElementById('bbe-date-input').value;
+  if (!val) { closeBbeModal(); return; }
+  // Convert YYYY-MM-DD to DD/MM/YYYY for storage/display
+  const parts = val.split('-');
+  const formatted = parts[2] + '/' + parts[1] + '/' + parts[0];
+  bbeData[_bbeEntryId] = formatted;
+  refreshBbeSummary(_bbeEntryId);
+  closeBbeModal();
+  toast('BBE saved: ' + formatted, 'success');
+}
+
+function clearBbe() {
+  delete bbeData[_bbeEntryId];
+  refreshBbeSummary(_bbeEntryId);
+  closeBbeModal();
+}
+
+function refreshBbeSummary(entryId) {
+  const el = document.getElementById('bbe-summary-' + entryId);
+  if (!el) return;
+  const bbe = bbeData[entryId];
+  el.textContent = bbe ? 'BBE: ' + bbe : '';
 }
 
 // ============================================================
