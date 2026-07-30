@@ -1134,7 +1134,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.51";
+const APP_VERSION = "2.5.52";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1732,6 +1732,34 @@ function selectLcLocation(code) {
   document.getElementById('lc-selected-product-preview').style.display = 'none';
   document.getElementById('lc-add-product-btn').disabled = true;
   renderLcLocationEntries();
+}
+
+function openAsnModal() {
+  if (!lwLocation || !lwLocationEntries.length) { toast('No entries in this location', 'error'); return; }
+  const missing = lwLocationEntries.filter(e => !ssccData[e.id] || !ssccData[e.id].length);
+  if (missing.length) { toast('Please add SSCCs to all ' + missing.length + ' entries first', 'error'); return; }
+  document.getElementById('asn-number-input').value = '';
+  document.getElementById('asn-date-input').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('asn-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('asn-number-input').focus(), 100);
+}
+
+function closeAsnModal() {
+  document.getElementById('asn-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function confirmExportMtsAsn() {
+  const asnNumber = document.getElementById('asn-number-input').value.trim();
+  const dateVal   = document.getElementById('asn-date-input').value;
+  let dueDate = '';
+  if (dateVal) {
+    const p = dateVal.split('-');
+    dueDate = p[2] + '/' + p[1] + '/' + p[0];
+  }
+  closeAsnModal();
+  exportMtsAsn(asnNumber, dueDate);
 }
 
 function exportMtsAsn(asnNumber, dueDate) {
