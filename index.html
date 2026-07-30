@@ -1087,7 +1087,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.49";
+const APP_VERSION = "2.5.50";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1791,8 +1791,10 @@ function renderLcLocationEntries() {
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-left:4px;">units</div>
       </div>
+      <div id="sscc-summary-${e.id}" style="font-size:11px;color:#2e7d32;padding:4px 0 2px;"></div>
     </div>
   `).join('');
+  lwLocationEntries.forEach(e => refreshSsccSummary(e.id));
 }
 
 // Product search for live count
@@ -3307,11 +3309,8 @@ function renderStockTakesList(items) {
           <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
-      <div id="sscc-summary-${e.id}" style="font-size:11px;color:#2e7d32;padding:4px 0 2px;"></div>
     </div>
   `).join('');
-  // Refresh SSCC summaries after render
-  lwLocationEntries.forEach(e => refreshSsccSummary(e.id));
 }
 
 async function createStockTake() {
