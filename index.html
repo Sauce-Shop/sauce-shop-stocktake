@@ -415,6 +415,7 @@
             </div>
             <div id="lc-nav-arrows" style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center;padding:0 8px;"></div>
             <button class="btn btn-sm btn-secondary" onclick="exportLcLocation()">Download</button>
+            <button class="btn btn-sm btn-secondary" onclick="exportMtsAsn()" style="background:#e3f2fd;border-color:#90caf9;color:#1565c0;">MTS ASN</button>
           </div>
           <div id="lc-location-entries"></div>
           <div id="lc-no-entries-yet" class="empty" style="display:none">
@@ -797,6 +798,31 @@
   </div>
 </div>
 
+<!-- SSCC MODAL -->
+<div id="sscc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;width:100%;max-width:440px;overflow:hidden;">
+    <div style="background:var(--brand);color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:800;font-size:16px;">📦 SSCC Numbers</div>
+        <div id="sscc-modal-subtitle" style="font-size:12px;opacity:0.85;margin-top:2px;"></div>
+      </div>
+      <button onclick="closeSsccModal()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕ Done</button>
+    </div>
+    <div style="padding:16px;">
+      <!-- Scan / enter SSCC -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="sscc-input" placeholder="Scan or type SSCC…" inputmode="numeric"
+          style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;"
+          onkeydown="if(event.key==='Enter')addSscc()">
+        <button onclick="startScan('sscc-scan')" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;">📷</button>
+        <button class="btn btn-primary" onclick="addSscc()" style="padding:10px 16px;">Add</button>
+      </div>
+      <!-- SSCC list -->
+      <div id="sscc-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- EMPTY LOCATION CHECK MODAL -->
 <div id="empty-check-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:700;align-items:center;justify-content:center;padding:16px;">
   <div style="background:white;border-radius:12px;width:100%;max-width:420px;overflow:hidden;">
@@ -1061,7 +1087,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.44";
+const APP_VERSION = "2.5.48";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1523,7 +1549,8 @@ function switchWarehouseTab(id) {
 // ============================================================
 // LIVE WAREHOUSE
 // ============================================================
-let lwEntries = [];        // all live warehouse entries for active warehouse
+let lwEntries = [];
+let ssccData = {}; // key = entryId -> [{sscc, qty}]        // all live warehouse entries for active warehouse
 let liveViewStockTake = null; // stock take currently shown in live view modal (for navigation)
 let liveViewIsLiveWarehouse = false; // whether live view is showing live warehouse
 let lwLocation = null;     // current location in livecount view
@@ -1649,6 +1676,51 @@ function selectLcLocation(code) {
   renderLcLocationEntries();
 }
 
+function exportMtsAsn() {
+  if (!lwLocation || !lwLocationEntries.length) {
+    toast('No entries in this location', 'error');
+    return;
+  }
+
+  // Check all entries have SSCCs
+  const missing = lwLocationEntries.filter(e => !ssccData[e.id] || !ssccData[e.id].length);
+  if (missing.length) {
+    toast('Please add SSCCs to all ' + missing.length + ' entries first', 'error');
+    return;
+  }
+
+  const headers = ['po_ref','due_date','line_no','product_code','quantity','pallet_ref','stockowner','batch_number','expiry_date'];
+  const rows = [];
+  let lineNo = 1;
+
+  lwLocationEntries.forEach(e => {
+    const ssccList = ssccData[e.id] || [];
+    const count    = ssccList.length;
+    // Convert single SKU to case code: drop (S), divide qty by 6
+    const caseCode = (e.ProductCode || '').replace(/\(S\)$/i, '').trim();
+    const totalQty = Number(e.CountQty) || 0;
+    const qtyPer   = count > 0 ? Math.round((totalQty / count / 6) * 100) / 100 : 0;
+
+    ssccList.forEach(s => {
+      rows.push([
+        '',           // po_ref
+        '',           // due_date
+        lineNo++,     // line_no
+        csvEscape(caseCode),
+        qtyPer,
+        csvEscape(s.sscc),
+        '',           // stockowner
+        csvEscape(e.BatchCode || ''),
+        ''            // expiry_date
+      ]);
+    });
+  });
+
+  const date = new Date().toISOString().slice(0, 10);
+  triggerCSVDownload([headers, ...rows], 'MTS-ASN-' + lwLocation + '-' + date + '.csv');
+  toast('MTS ASN downloaded — ' + (lineNo - 1) + ' lines', 'success');
+}
+
 function exportLcLocation() {
   if (!lwLocation || !lwLocationEntries.length) {
     toast('No entries to export', 'error');
@@ -1695,6 +1767,7 @@ function renderLcLocationEntries() {
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
           <button class="btn btn-sm btn-secondary" onclick="startMoveEntry('${e.id}')" title="Move to another location">📦 Move</button>
+          <button class="btn btn-sm" onclick="openSsccModal('${e.id}')" title="Add SSCC numbers" style="background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;">+ SSCC</button>
           <button class="del-btn" onclick="deleteLcEntry('${e.id}')" title="Remove">✕</button>
         </div>
       </div>
@@ -1941,25 +2014,30 @@ function showLiveWarehouseExport() {
   document.body.style.overflow = 'hidden';
 }
 
-function downloadLwLocationsCSV() {
+async function downloadLwLocationsCSV() {
   const wh = WAREHOUSES.find(w => w.id === activeWarehouseTab) || WAREHOUSES[0];
-  const mine = lwEntries.filter(e => e.Warehouse === wh.name);
-  if (!mine.length) { toast('No data to export', 'error'); return; }
-  const headers = ['LocationCode', 'ProductCode', 'ProductDescription', 'CountQty', 'BatchCode', 'Warehouse'];
-  const rows = mine
-    .sort((a, b) => (a.LocationCode||'').localeCompare(b.LocationCode||'') || (a.ProductCode||'').localeCompare(b.ProductCode||''))
-    .map(e => [
-      csvEscape(e.LocationCode || ''),
-      csvEscape(e.ProductCode || ''),
-      csvEscape(e.ProductDescription || ''),
-      e.CountQty,
-      csvEscape(e.BatchCode || ''),
-      csvEscape(e.Warehouse || '')
-    ]);
-  const date = new Date().toISOString().slice(0, 10);
-  triggerCSVDownload([headers, ...rows], 'lw-locations-' + wh.id + '-' + date + '.csv');
-  toast('Downloaded ' + mine.length + ' entries', 'success');
   closeLwExportModal();
+  try {
+    const all = await getListItems(CONFIG.listLiveWarehouse);
+    const mine = all.filter(e => e.Warehouse === wh.name);
+    if (!mine.length) { toast('No data to export', 'error'); return; }
+    const headers = ['LocationCode', 'ProductCode', 'ProductDescription', 'CountQty', 'BatchCode', 'Warehouse'];
+    const rows = mine
+      .sort((a, b) => (a.LocationCode||'').localeCompare(b.LocationCode||'') || (a.ProductCode||'').localeCompare(b.ProductCode||''))
+      .map(e => [
+        csvEscape(e.LocationCode || ''),
+        csvEscape(e.ProductCode || ''),
+        csvEscape(e.ProductDescription || ''),
+        e.CountQty,
+        csvEscape(e.BatchCode || ''),
+        csvEscape(e.Warehouse || '')
+      ]);
+    const date = new Date().toISOString().slice(0, 10);
+    triggerCSVDownload([headers, ...rows], 'lw-locations-' + wh.id + '-' + date + '.csv');
+    toast('Downloaded ' + mine.length + ' entries', 'success');
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+  }
 }
 
 function closeLwExportModal() {
@@ -2764,6 +2842,106 @@ function skipEmptyLocation() {
   showEmptyCheckModal();
 }
 
+// ============================================================
+// SSCC MANAGEMENT
+// ============================================================
+let _ssccEntryId = null;
+
+function openSsccModal(entryId) {
+  _ssccEntryId = entryId;
+  const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  document.getElementById('sscc-modal-subtitle').textContent =
+    entry.ProductCode + (entry.BatchCode ? ' · Batch: ' + entry.BatchCode : '') + ' · Qty: ' + entry.CountQty;
+  document.getElementById('sscc-input').value = '';
+  renderSsccList(entryId, entry.CountQty);
+  document.getElementById('sscc-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('sscc-input').focus(), 100);
+}
+
+function closeSsccModal() {
+  document.getElementById('sscc-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  refreshSsccSummary(_ssccEntryId);
+  _ssccEntryId = null;
+}
+
+function addSscc() {
+  const input = document.getElementById('sscc-input');
+  const val = input.value.trim();
+  if (!val) return;
+  if (!ssccData[_ssccEntryId]) ssccData[_ssccEntryId] = [];
+  // Prevent duplicates
+  if (ssccData[_ssccEntryId].find(s => s.sscc === val)) {
+    toast('SSCC already added', 'error');
+    return;
+  }
+  ssccData[_ssccEntryId].push({ sscc: val });
+  input.value = '';
+  // Recalculate qtys
+  const entry = lwEntries.find(e => e.id === _ssccEntryId) || lwLocationEntries.find(e => e.id === _ssccEntryId);
+  renderSsccList(_ssccEntryId, entry ? entry.CountQty : 0);
+  input.focus();
+}
+
+function removeSscc(entryId, sscc) {
+  if (!ssccData[entryId]) return;
+  ssccData[entryId] = ssccData[entryId].filter(s => s.sscc !== sscc);
+  const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
+  renderSsccList(entryId, entry ? entry.CountQty : 0);
+}
+
+function renderSsccList(entryId, totalQty) {
+  const list = document.getElementById('sscc-list');
+  const items = ssccData[entryId] || [];
+  list.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:#aaa;font-size:13px;text-align:center;padding:12px;';
+    empty.textContent = 'No SSCCs added yet';
+    list.appendChild(empty);
+    return;
+  }
+  const qtyPer = Math.round((totalQty / items.length) * 100) / 100;
+  items.forEach(s => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f9f9f9;border:1px solid var(--border);border-radius:8px;padding:8px 12px;';
+
+    const info = document.createElement('div');
+    const code = document.createElement('div');
+    code.style.cssText = 'font-size:13px;font-weight:700;font-family:monospace;';
+    code.textContent = s.sscc;
+    const qty = document.createElement('div');
+    qty.style.cssText = 'font-size:11px;color:#888;';
+    qty.textContent = qtyPer + ' units';
+    info.appendChild(code);
+    info.appendChild(qty);
+
+    const del = document.createElement('button');
+    del.style.cssText = 'background:none;border:none;color:#e53935;font-size:18px;cursor:pointer;padding:0 4px;';
+    del.textContent = '×';
+    del.addEventListener('click', () => { removeSscc(entryId, s.sscc); });
+
+    row.appendChild(info);
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+function refreshSsccSummary(entryId) {
+  const el = document.getElementById('sscc-summary-' + entryId);
+  if (!el) return;
+  const items = ssccData[entryId] || [];
+  el.textContent = items.length ? items.length + ' SSCC' + (items.length > 1 ? 's' : '') + ' recorded' : '';
+}
+
+// Hook scanner result for SSCC
+function handleSsccScan(code) {
+  document.getElementById('sscc-input').value = code;
+  addSscc();
+}
+
 function closeEmptyCheck() {
   document.getElementById('empty-check-modal').style.display = 'none';
   document.body.style.overflow = '';
@@ -3065,8 +3243,11 @@ function renderStockTakesList(items) {
           <button class="btn btn-sm" style="background:none;border:1px solid #e0e0e0;color:#c62828;padding:6px 10px;" onclick="deleteStockTake('${st.id}', '${st.Title.replace(/'/g, "\'")}')">🗑</button>
         </div>
       </div>
+      <div id="sscc-summary-${e.id}" style="font-size:11px;color:#2e7d32;padding:4px 0 2px;"></div>
     </div>
   `).join('');
+  // Refresh SSCC summaries after render
+  lwLocationEntries.forEach(e => refreshSsccSummary(e.id));
 }
 
 async function createStockTake() {
@@ -4349,6 +4530,9 @@ function handleScannedCode(code, target) {
   } else if (target === 'np-barcode') {
     document.getElementById('np-barcode').value = code;
     toast('EAN scanned: ' + code, 'success');
+  } else if (target === 'sscc-scan') {
+    document.getElementById('sscc-input').value = code;
+    addSscc();
   } else if (target === 'lc-location') {
     const loc = code.toUpperCase();
     if (buildLocationSet().has(loc)) {
