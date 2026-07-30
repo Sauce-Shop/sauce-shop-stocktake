@@ -1134,7 +1134,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.52";
+const APP_VERSION = "2.5.53";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1170,6 +1170,7 @@ let CONFIG = {
   listChangelog: 'LiveWarehouseChangelog',
   listOperators: 'Operators',
   listSSCC: 'LiveWarehouseSSCC',
+  listBBE:  'LiveWarehouseBBE',
   listUnleashedStock: 'DevUnleashedStock',
   clientId: '',
   tenantId: ''
@@ -1418,6 +1419,13 @@ async function getListItems(listName, filter = '') {
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
       f.BatchCode      = f.BatchCode || '';
+    }
+    if (listName === CONFIG.listBBE) {
+      f.ProductCode  = f.Title   || '';
+      f.LocationCode = f.field_1 || '';
+      f.BatchCode    = f.field_2 || '';
+      f.BBEDate      = f.field_3 || '';
+      f.Warehouse    = f.field_4 || '';
     }
     if (listName === CONFIG.listSSCC) {
       f.ProductCode  = f.Title     || '';
@@ -1724,6 +1732,7 @@ function selectLcLocation(code) {
   document.getElementById('lc-location-dropdown').style.display = 'none';
   renderNavArrows('lc-nav-arrows', code, 'selectLcLocation');
   loadSsccForLocation(code);
+  loadBbeForLocation(code);
   document.getElementById('lc-current-location-display').textContent = code;
   lwLocationEntries = lwEntries.filter(e => e.LocationCode === code);
   document.getElementById('lc-location-panel').style.display = 'block';
@@ -1774,7 +1783,8 @@ function exportMtsAsn(asnNumber, dueDate) {
     const caseCode = (e.ProductCode || '').replace(/\(S\)$/i, '').trim();
     const totalQty = Number(e.CountQty) || 0;
     const qtyPer   = count > 0 ? Math.round((totalQty / count / 6) * 100) / 100 : 0;
-    const expiry   = bbeData[e.id] || '';
+    const bbeEntry = bbeData[e.id];
+    const expiry   = bbeEntry ? (bbeEntry.date || bbeEntry) : '';
 
     ssccList.forEach(s => {
       rows.push([
@@ -2926,6 +2936,28 @@ function skipEmptyLocation() {
 // ============================================================
 let _bbeEntryId = null;
 
+async function loadBbeForLocation(locationCode) {
+  try {
+    const all = await getListItems(CONFIG.listBBE);
+    const mine = all.filter(e =>
+      e.LocationCode === locationCode &&
+      e.Warehouse === activeWarehouseName
+    );
+    mine.forEach(item => {
+      const entry = lwLocationEntries.find(e =>
+        e.ProductCode === item.ProductCode &&
+        (e.BatchCode || '') === (item.BatchCode || '')
+      );
+      if (entry) {
+        bbeData[entry.id] = { date: item.BBEDate, spId: item.id };
+        refreshBbeSummary(entry.id);
+      }
+    });
+  } catch(err) {
+    console.error('Load BBE error:', err);
+  }
+}
+
 function openBbeModal(entryId) {
   _bbeEntryId = entryId;
   const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
@@ -2935,8 +2967,8 @@ function openBbeModal(entryId) {
   // Pre-populate with existing BBE if set
   const existing = bbeData[entryId];
   if (existing) {
-    // Convert DD/MM/YYYY to YYYY-MM-DD for the date input
-    const parts = existing.split('/');
+    const dateStr = existing.date || existing;
+    const parts = dateStr.split('/');
     document.getElementById('bbe-date-input').value = parts[2] + '-' + parts[1] + '-' + parts[0];
   } else {
     document.getElementById('bbe-date-input').value = '';
@@ -2951,29 +2983,56 @@ function closeBbeModal() {
   _bbeEntryId = null;
 }
 
-function saveBbe() {
+async function saveBbe() {
   const val = document.getElementById('bbe-date-input').value;
   if (!val) { closeBbeModal(); return; }
   // Convert YYYY-MM-DD to DD/MM/YYYY for storage/display
   const parts = val.split('-');
   const formatted = parts[2] + '/' + parts[1] + '/' + parts[0];
-  bbeData[_bbeEntryId] = formatted;
+  bbeData[_bbeEntryId] = { date: formatted, spId: bbeData[_bbeEntryId]?.spId || null };
   refreshBbeSummary(_bbeEntryId);
   closeBbeModal();
   toast('BBE saved: ' + formatted, 'success');
+  // Save/update in SharePoint
+  const entry = lwEntries.find(e => e.id === _bbeEntryId) || lwLocationEntries.find(e => e.id === _bbeEntryId);
+  if (entry) {
+    const existing = bbeData[_bbeEntryId];
+    const payload = {
+      Title:   entry.ProductCode,
+      field_1: entry.LocationCode || lwLocation,
+      field_2: entry.BatchCode || '',
+      field_3: formatted,
+      field_4: entry.Warehouse || activeWarehouseName
+    };
+    try {
+      if (existing.spId) {
+        await updateListItem(CONFIG.listBBE, existing.spId, payload);
+      } else {
+        const result = await createListItem(CONFIG.listBBE, payload);
+        bbeData[_bbeEntryId].spId = result.id;
+      }
+    } catch(err) {
+      console.error('BBE save error:', err);
+      toast('⚠️ BBE saved locally but failed to write to SharePoint', 'error');
+    }
+  }
 }
 
-function clearBbe() {
+async function clearBbe() {
+  const existing = bbeData[_bbeEntryId];
   delete bbeData[_bbeEntryId];
   refreshBbeSummary(_bbeEntryId);
   closeBbeModal();
+  if (existing && existing.spId) {
+    try { await deleteListItem(CONFIG.listBBE, existing.spId); } catch(err) { console.error('BBE delete error:', err); }
+  }
 }
 
 function refreshBbeSummary(entryId) {
   const el = document.getElementById('bbe-summary-' + entryId);
   if (!el) return;
   const bbe = bbeData[entryId];
-  el.textContent = bbe ? 'BBE: ' + bbe : '';
+  el.textContent = bbe ? 'BBE: ' + (bbe.date || bbe) : '';
 }
 
 // ============================================================
