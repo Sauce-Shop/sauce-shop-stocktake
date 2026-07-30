@@ -1134,7 +1134,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.53";
+const APP_VERSION = "2.5.54";
 
 // ============================================================
 // EMBEDDED DATA
@@ -2986,17 +2986,18 @@ function closeBbeModal() {
 async function saveBbe() {
   const val = document.getElementById('bbe-date-input').value;
   if (!val) { closeBbeModal(); return; }
-  // Convert YYYY-MM-DD to DD/MM/YYYY for storage/display
+  // Capture entryId before closing modal (closeBbeModal nulls _bbeEntryId)
+  const entryId = _bbeEntryId;
   const parts = val.split('-');
   const formatted = parts[2] + '/' + parts[1] + '/' + parts[0];
-  bbeData[_bbeEntryId] = { date: formatted, spId: bbeData[_bbeEntryId]?.spId || null };
-  refreshBbeSummary(_bbeEntryId);
+  const existingSpId = bbeData[entryId]?.spId || null;
+  bbeData[entryId] = { date: formatted, spId: existingSpId };
+  refreshBbeSummary(entryId);
   closeBbeModal();
   toast('BBE saved: ' + formatted, 'success');
   // Save/update in SharePoint
-  const entry = lwEntries.find(e => e.id === _bbeEntryId) || lwLocationEntries.find(e => e.id === _bbeEntryId);
+  const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
   if (entry) {
-    const existing = bbeData[_bbeEntryId];
     const payload = {
       Title:   entry.ProductCode,
       field_1: entry.LocationCode || lwLocation,
@@ -3005,11 +3006,11 @@ async function saveBbe() {
       field_4: entry.Warehouse || activeWarehouseName
     };
     try {
-      if (existing.spId) {
-        await updateListItem(CONFIG.listBBE, existing.spId, payload);
+      if (existingSpId) {
+        await updateListItem(CONFIG.listBBE, existingSpId, payload);
       } else {
         const result = await createListItem(CONFIG.listBBE, payload);
-        bbeData[_bbeEntryId].spId = result.id;
+        bbeData[entryId].spId = result.id;
       }
     } catch(err) {
       console.error('BBE save error:', err);
@@ -3019,9 +3020,10 @@ async function saveBbe() {
 }
 
 async function clearBbe() {
-  const existing = bbeData[_bbeEntryId];
-  delete bbeData[_bbeEntryId];
-  refreshBbeSummary(_bbeEntryId);
+  const entryId = _bbeEntryId;
+  const existing = bbeData[entryId];
+  delete bbeData[entryId];
+  refreshBbeSummary(entryId);
   closeBbeModal();
   if (existing && existing.spId) {
     try { await deleteListItem(CONFIG.listBBE, existing.spId); } catch(err) { console.error('BBE delete error:', err); }
