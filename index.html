@@ -1087,7 +1087,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.48";
+const APP_VERSION = "2.5.49";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1122,6 +1122,7 @@ let CONFIG = {
   listLiveWarehouse: 'LiveWarehouse',
   listChangelog: 'LiveWarehouseChangelog',
   listOperators: 'Operators',
+  listSSCC: 'LiveWarehouseSSCC',
   listUnleashedStock: 'DevUnleashedStock',
   clientId: '',
   tenantId: ''
@@ -1370,6 +1371,14 @@ async function getListItems(listName, filter = '') {
       f.ProductDescription = f.field_4 || '';
       f.CountQty       = f.field_5 !== undefined ? Number(f.field_5) : 0;
       f.BatchCode      = f.BatchCode || '';
+    }
+    if (listName === CONFIG.listSSCC) {
+      f.ProductCode  = f.Title     || '';
+      f.LocationCode = f.field_1   || '';
+      f.BatchCode    = f.field_2   || '';
+      f.SSCCNumber   = f.field_3   || '';
+      f.Warehouse    = f.field_4   || '';
+      f.CreatedBy    = f.field_5   || '';
     }
     if (listName === CONFIG.listProducts) {
       f.code        = f.Title || '';
@@ -1666,6 +1675,7 @@ function selectLcLocation(code) {
   document.getElementById('lc-location-input').value = code;
   document.getElementById('lc-location-dropdown').style.display = 'none';
   renderNavArrows('lc-nav-arrows', code, 'selectLcLocation');
+  loadSsccForLocation(code);
   document.getElementById('lc-current-location-display').textContent = code;
   lwLocationEntries = lwEntries.filter(e => e.LocationCode === code);
   document.getElementById('lc-location-panel').style.display = 'block';
@@ -2847,6 +2857,35 @@ function skipEmptyLocation() {
 // ============================================================
 let _ssccEntryId = null;
 
+async function loadSsccForLocation(locationCode) {
+  try {
+    const all = await getListItems(CONFIG.listSSCC);
+    const mine = all.filter(e =>
+      e.LocationCode === locationCode &&
+      e.Warehouse === activeWarehouseName
+    );
+    // Map to entries by ProductCode+BatchCode
+    mine.forEach(item => {
+      // Find matching LW entry
+      const entry = lwLocationEntries.find(e =>
+        e.ProductCode === item.ProductCode &&
+        (e.BatchCode || '') === (item.BatchCode || '')
+      );
+      if (entry) {
+        if (!ssccData[entry.id]) ssccData[entry.id] = [];
+        // Avoid duplicates
+        if (!ssccData[entry.id].find(s => s.sscc === item.SSCCNumber)) {
+          ssccData[entry.id].push({ sscc: item.SSCCNumber, spId: item.id });
+        }
+      }
+    });
+    // Refresh summaries
+    lwLocationEntries.forEach(e => refreshSsccSummary(e.id));
+  } catch(err) {
+    console.error('Load SSCC error:', err);
+  }
+}
+
 function openSsccModal(entryId) {
   _ssccEntryId = entryId;
   const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
@@ -2867,7 +2906,7 @@ function closeSsccModal() {
   _ssccEntryId = null;
 }
 
-function addSscc() {
+async function addSscc() {
   const input = document.getElementById('sscc-input');
   const val = input.value.trim();
   if (!val) return;
@@ -2877,19 +2916,44 @@ function addSscc() {
     toast('SSCC already added', 'error');
     return;
   }
-  ssccData[_ssccEntryId].push({ sscc: val });
-  input.value = '';
-  // Recalculate qtys
   const entry = lwEntries.find(e => e.id === _ssccEntryId) || lwLocationEntries.find(e => e.id === _ssccEntryId);
-  renderSsccList(_ssccEntryId, entry ? entry.CountQty : 0);
+  if (!entry) return;
+  const newItem = { sscc: val, spId: null };
+  ssccData[_ssccEntryId].push(newItem);
+  input.value = '';
+  renderSsccList(_ssccEntryId, entry.CountQty);
   input.focus();
+  // Save to SharePoint
+  try {
+    const result = await createListItem(CONFIG.listSSCC, {
+      Title:   entry.ProductCode,
+      field_1: entry.LocationCode || lwLocation,
+      field_2: entry.BatchCode || '',
+      field_3: val,
+      field_4: entry.Warehouse || activeWarehouseName,
+      field_5: getChangedBy()
+    });
+    newItem.spId = result.id;
+  } catch(err) {
+    console.error('SSCC save error:', err);
+    toast('⚠️ SSCC saved locally but failed to write to SharePoint', 'error');
+  }
 }
 
-function removeSscc(entryId, sscc) {
+async function removeSscc(entryId, sscc) {
   if (!ssccData[entryId]) return;
+  const item = ssccData[entryId].find(s => s.sscc === sscc);
   ssccData[entryId] = ssccData[entryId].filter(s => s.sscc !== sscc);
   const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
   renderSsccList(entryId, entry ? entry.CountQty : 0);
+  // Delete from SharePoint
+  if (item && item.spId) {
+    try {
+      await deleteListItem(CONFIG.listSSCC, item.spId);
+    } catch(err) {
+      console.error('SSCC delete error:', err);
+    }
+  }
 }
 
 function renderSsccList(entryId, totalQty) {
