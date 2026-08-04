@@ -835,7 +835,7 @@
         <input type="text" id="sscc-input" placeholder="Scan or type SSCC…" inputmode="numeric"
           style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;"
           onkeydown="if(event.key==='Enter')addSscc()">
-        <button onclick="startScan('sscc-scan')" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;">📷</button>
+        <button onclick="openScanner('sscc-scan')" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;">📷</button>
         <button class="btn btn-primary" onclick="addSscc()" style="padding:10px 16px;">Add</button>
       </div>
       <!-- SSCC list -->
@@ -1134,7 +1134,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.54";
+const APP_VERSION = "2.5.55";
 
 // ============================================================
 // EMBEDDED DATA
