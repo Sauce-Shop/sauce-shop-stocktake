@@ -1139,7 +1139,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.57";
+const APP_VERSION = "2.5.58";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1751,8 +1751,30 @@ function selectLcLocation(code) {
 
 function openAsnModal() {
   if (!lwLocation || !lwLocationEntries.length) { toast('No entries in this location', 'error'); return; }
-  const missing = lwLocationEntries.filter(e => !ssccData[e.id] || !ssccData[e.id].length);
-  if (missing.length) { toast('Please add SSCCs to all ' + missing.length + ' entries first', 'error'); return; }
+
+  // Check all entries have SSCCs
+  const missingSSCC = lwLocationEntries.filter(e => !ssccData[e.id] || !ssccData[e.id].length);
+  if (missingSSCC.length) {
+    toast('Please add SSCCs to all ' + missingSSCC.length + ' entries first', 'error');
+    return;
+  }
+
+  // Check SSCC qtys match location qtys
+  const mismatches = [];
+  lwLocationEntries.forEach(e => {
+    const items    = ssccData[e.id] || [];
+    const ssccTotal = items.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+    const locQty   = Number(e.CountQty) || 0;
+    if (Math.abs(ssccTotal - locQty) > 0.001) {
+      mismatches.push(e.ProductCode + ': location=' + locQty + ', SSCC total=' + ssccTotal);
+    }
+  });
+
+  if (mismatches.length) {
+    toast('Qty mismatch — fix before downloading:\n' + mismatches.join('\n'), 'error');
+    return;
+  }
+
   document.getElementById('asn-number-input').value = '';
   document.getElementById('asn-date-input').value = new Date().toISOString().slice(0, 10);
   document.getElementById('asn-modal').style.display = 'flex';
