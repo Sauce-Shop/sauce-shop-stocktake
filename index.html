@@ -831,12 +831,17 @@
     </div>
     <div style="padding:16px;">
       <!-- Scan / enter SSCC -->
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
         <input type="text" id="sscc-input" placeholder="Scan or type SSCC…" inputmode="numeric"
           style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;"
-          onkeydown="if(event.key==='Enter')addSscc()">
+          onkeydown="if(event.key==='Enter')document.getElementById('sscc-qty-input').focus()">
         <button onclick="openScanner('sscc-scan')" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;">📷</button>
-        <button class="btn btn-primary" onclick="addSscc()" style="padding:10px 16px;">Add</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="number" id="sscc-qty-input" placeholder="Qty" inputmode="decimal" min="0" step="0.001"
+          style="width:100px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;"
+          onkeydown="if(event.key==='Enter')addSscc()">
+        <button class="btn btn-primary" style="flex:1;" onclick="addSscc()">Add SSCC</button>
       </div>
       <!-- SSCC list -->
       <div id="sscc-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
@@ -1134,7 +1139,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.55";
+const APP_VERSION = "2.5.57";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1434,6 +1439,7 @@ async function getListItems(listName, filter = '') {
       f.SSCCNumber   = f.field_3   || '';
       f.Warehouse    = f.field_4   || '';
       f.CreatedBy    = f.field_5   || '';
+      f.SSCCQty      = f.field_6 !== undefined ? Number(f.field_6) : 0;
     }
     if (listName === CONFIG.listProducts) {
       f.code        = f.Title || '';
@@ -1782,17 +1788,18 @@ function exportMtsAsn(asnNumber, dueDate) {
     // Convert single SKU to case code: drop (S), divide qty by 6
     const caseCode = (e.ProductCode || '').replace(/\(S\)$/i, '').trim();
     const totalQty = Number(e.CountQty) || 0;
-    const qtyPer   = count > 0 ? Math.round((totalQty / count / 6) * 100) / 100 : 0;
     const bbeEntry = bbeData[e.id];
     const expiry   = bbeEntry ? (bbeEntry.date || bbeEntry) : '';
 
     ssccList.forEach(s => {
+      const ssccQty = s.qty || (count > 0 ? totalQty / count : 0);
+      const caseQty = Math.round((ssccQty / 6) * 100) / 100;
       rows.push([
         csvEscape(asnNumber || ''),
         csvEscape(dueDate   || ''),
         lineNo++,
         csvEscape(caseCode),
-        qtyPer,
+        caseQty,
         csvEscape(s.sscc),
         '',
         csvEscape(e.BatchCode || ''),
@@ -3060,7 +3067,7 @@ async function loadSsccForLocation(locationCode) {
         if (!ssccData[entry.id]) ssccData[entry.id] = [];
         // Avoid duplicates
         if (!ssccData[entry.id].find(s => s.sscc === item.SSCCNumber)) {
-          ssccData[entry.id].push({ sscc: item.SSCCNumber, spId: item.id });
+          ssccData[entry.id].push({ sscc: item.SSCCNumber, qty: item.SSCCQty || 0, spId: item.id });
         }
       }
     });
@@ -3101,11 +3108,14 @@ async function addSscc() {
     toast('SSCC already added', 'error');
     return;
   }
+  const qtyInput = document.getElementById('sscc-qty-input');
+  const qty = parseFloat(qtyInput.value) || 0;
   const entry = lwEntries.find(e => e.id === _ssccEntryId) || lwLocationEntries.find(e => e.id === _ssccEntryId);
   if (!entry) return;
-  const newItem = { sscc: val, spId: null };
+  const newItem = { sscc: val, qty: qty, spId: null };
   ssccData[_ssccEntryId].push(newItem);
   input.value = '';
+  qtyInput.value = '';
   renderSsccList(_ssccEntryId, entry.CountQty);
   input.focus();
   // Save to SharePoint
@@ -3116,7 +3126,8 @@ async function addSscc() {
       field_2: entry.BatchCode || '',
       field_3: val,
       field_4: entry.Warehouse || activeWarehouseName,
-      field_5: getChangedBy()
+      field_5: getChangedBy(),
+      field_6: qty
     });
     newItem.spId = result.id;
   } catch(err) {
@@ -3152,20 +3163,19 @@ function renderSsccList(entryId, totalQty) {
     list.appendChild(empty);
     return;
   }
-  const qtyPer = Math.round((totalQty / items.length) * 100) / 100;
   items.forEach(s => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f9f9f9;border:1px solid var(--border);border-radius:8px;padding:8px 12px;';
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f9f9f9;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;';
 
     const info = document.createElement('div');
     const code = document.createElement('div');
     code.style.cssText = 'font-size:13px;font-weight:700;font-family:monospace;';
     code.textContent = s.sscc;
-    const qty = document.createElement('div');
-    qty.style.cssText = 'font-size:11px;color:#888;';
-    qty.textContent = qtyPer + ' units';
+    const qtyEl = document.createElement('div');
+    qtyEl.style.cssText = 'font-size:11px;color:#888;';
+    qtyEl.textContent = s.qty ? s.qty + ' units' : 'No qty set';
     info.appendChild(code);
-    info.appendChild(qty);
+    info.appendChild(qtyEl);
 
     const del = document.createElement('button');
     del.style.cssText = 'background:none;border:none;color:#e53935;font-size:18px;cursor:pointer;padding:0 4px;';
