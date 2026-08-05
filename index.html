@@ -843,8 +843,10 @@
           onkeydown="if(event.key==='Enter')addSscc()">
         <button class="btn btn-primary" style="flex:1;" onclick="addSscc()">Add SSCC</button>
       </div>
+      <!-- Totals bar -->
+      <div id="sscc-totals" style="display:flex;justify-content:space-between;align-items:center;background:#f5f5f5;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;"></div>
       <!-- SSCC list -->
-      <div id="sscc-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+      <div id="sscc-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;"></div>
     </div>
   </div>
 </div>
@@ -1139,7 +1141,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.58";
+const APP_VERSION = "2.5.59";
 
 // ============================================================
 // EMBEDDED DATA
@@ -3139,6 +3141,7 @@ async function addSscc() {
   input.value = '';
   qtyInput.value = '';
   renderSsccList(_ssccEntryId, entry.CountQty);
+  refreshSsccSummary(_ssccEntryId);
   input.focus();
   // Save to SharePoint
   try {
@@ -3185,6 +3188,20 @@ function renderSsccList(entryId, totalQty) {
     list.appendChild(empty);
     return;
   }
+  // Update totals bar
+  const ssccTotal = items.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+  const totalsEl = document.getElementById('sscc-totals');
+  if (totalsEl) {
+    const diff = ssccTotal - totalQty;
+    const match = Math.abs(diff) < 0.001;
+    totalsEl.innerHTML =
+      '<span>Batch Qty: <strong>' + totalQty + '</strong></span>' +
+      '<span>SSCC Total: <strong>' + ssccTotal + '</strong></span>' +
+      '<span style="color:' + (match ? '#2e7d32' : '#c62828') + ';font-weight:700;">' +
+        (match ? '✓ Match' : 'Diff: ' + (diff > 0 ? '+' : '') + Math.round(diff * 1000) / 1000) +
+      '</span>';
+  }
+
   items.forEach(s => {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#f9f9f9;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;';
@@ -3214,7 +3231,17 @@ function refreshSsccSummary(entryId) {
   const el = document.getElementById('sscc-summary-' + entryId);
   if (!el) return;
   const items = ssccData[entryId] || [];
-  el.textContent = items.length ? items.length + ' SSCC' + (items.length > 1 ? 's' : '') + ' recorded' : '';
+  if (!items.length) { el.textContent = ''; return; }
+
+  const entry = lwEntries.find(e => e.id === entryId) || lwLocationEntries.find(e => e.id === entryId);
+  const locQty   = entry ? Number(entry.CountQty) || 0 : 0;
+  const ssccTotal = items.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+  const match = Math.abs(ssccTotal - locQty) < 0.001;
+
+  el.innerHTML = items.length + ' SSCC' + (items.length > 1 ? 's' : '') + ' recorded' +
+    (match
+      ? ''
+      : ' &nbsp;<span style="color:#c62828;font-weight:700;">⚠ SSCC Quantity Does Not Match Batch Quantity</span>');
 }
 
 // Hook scanner result for SSCC
