@@ -1141,7 +1141,7 @@
 // ============================================================
 // VERSION
 // ============================================================
-const APP_VERSION = "2.5.59";
+const APP_VERSION = "2.5.60";
 
 // ============================================================
 // EMBEDDED DATA
@@ -1833,7 +1833,7 @@ function exportMtsAsn(asnNumber, dueDate) {
   });
 
   const date = new Date().toISOString().slice(0, 10);
-  triggerCSVDownload([headers, ...rows], 'MTS-ASN-' + lwLocation + '-' + date + '.csv');
+  triggerCSVDownload([headers, ...rows], 'MTS_ASN_' + lwLocation.replace(/-/g, '_') + '_' + date + '.csv');
   toast('MTS ASN downloaded — ' + (lineNo - 1) + ' lines', 'success');
 }
 
@@ -3497,6 +3497,57 @@ async function confirmMoveEntry(targetLocation) {
     // Log target location — what arrived in that bay
     const targetQtyBefore = targetQtyAfter - moveQty;
     logChange('Move In', entry.ProductCode, entry.BatchCode, targetWh.name, entry.LocationCode, targetLocation, targetQtyBefore, targetQtyAfter);
+
+    // ── Move SSCCs to target location ────────────────────────────────────────
+    const sourceSsccItems = ssccData[moveEntryId] || [];
+    if (sourceSsccItems.length) {
+      // Find the new target entry ID from refreshed lwEntries
+      const targetEntry = lwEntries.find(e =>
+        e.LocationCode === targetLocation &&
+        e.ProductCode === entry.ProductCode &&
+        (e.BatchCode || '') === (entry.BatchCode || '') &&
+        e.Warehouse === targetWh.name
+      );
+      const targetEntryId = targetEntry ? targetEntry.id : null;
+
+      // Delete old SSCC SP records and recreate at new location
+      for (const s of sourceSsccItems) {
+        try {
+          if (s.spId) await deleteListItem(CONFIG.listSSCC, s.spId);
+        } catch(err) { console.error('SSCC delete on move:', err); }
+        // Create at target location
+        try {
+          const result = await createListItem(CONFIG.listSSCC, {
+            Title:   entry.ProductCode,
+            field_1: targetLocation,
+            field_2: entry.BatchCode || '',
+            field_3: s.sscc,
+            field_4: targetWh.name,
+            field_5: getChangedBy(),
+            field_6: s.qty || 0
+          });
+          s.spId = result.id;
+        } catch(err) { console.error('SSCC create on move:', err); }
+      }
+
+      // Update in-memory ssccData — move from source to target entry ID
+      if (targetEntryId) {
+        if (!ssccData[targetEntryId]) ssccData[targetEntryId] = [];
+        // Merge (target may already have some SSCCs)
+        sourceSsccItems.forEach(s => {
+          if (!ssccData[targetEntryId].find(x => x.sscc === s.sscc)) {
+            ssccData[targetEntryId].push(s);
+          }
+        });
+      }
+      // Clear source if full move
+      if (remainingQty <= 0) {
+        delete ssccData[moveEntryId];
+      }
+      // Refresh summaries
+      if (targetEntryId) refreshSsccSummary(targetEntryId);
+      refreshSsccSummary(moveEntryId);
+    }
     const label = remainingQty > 0 ? ` (${remainingQty} remaining at ${entry.LocationCode})` : '';
     toast(`Moved ${moveQty} to ${targetLocation} ✓${label}`, 'success');
   } catch(e) {
